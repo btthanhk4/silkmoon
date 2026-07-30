@@ -2,41 +2,9 @@ import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { arApi, reviewsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { prepareUploadImage } from '../utils/prepareUploadImage';
 
 const MAX_REVIEW_IMAGES = 4;
-const MAX_REVIEW_IMAGE_SIZE = 20 * 1024 * 1024;
-const REVIEW_IMAGE_EXTENSION = /\.(jpe?g|png|webp|heic|heif)$/i;
-
-const prepareReviewImage = (file) => new Promise((resolve, reject) => {
-  const isImage = file && (file.type.startsWith('image/') || REVIEW_IMAGE_EXTENSION.test(file.name));
-  if (!isImage) return reject(new Error('Chỉ hỗ trợ ảnh JPG, PNG, WebP hoặc HEIC.'));
-  if (file.size > MAX_REVIEW_IMAGE_SIZE) return reject(new Error('Mỗi ảnh cần nhỏ hơn 20 MB.'));
-
-  const objectUrl = URL.createObjectURL(file);
-  const image = new Image();
-  image.onload = () => {
-    try {
-      const maxDimension = 1600;
-      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('Không thể xử lý ảnh.');
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
-    } catch {
-      reject(new Error('Không thể xử lý ảnh này. Vui lòng thử ảnh khác.'));
-    } finally {
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
-  image.onerror = () => {
-    URL.revokeObjectURL(objectUrl);
-    reject(new Error('Không thể đọc ảnh này. Vui lòng thử ảnh JPG khác.'));
-  };
-  image.src = objectUrl;
-});
 
 export default function ProductReviews({ productId }) {
   const { user } = useAuth();
@@ -104,7 +72,7 @@ export default function ProductReviews({ productId }) {
     setIsPreparingImages(true);
     setReviewImageError('');
     try {
-      const preparedImages = await Promise.all(files.map(prepareReviewImage));
+      const preparedImages = await Promise.all(files.map(prepareUploadImage));
       setReviewImages((current) => [...current, ...preparedImages].slice(0, MAX_REVIEW_IMAGES));
     } catch (error) {
       setReviewImageError(error.message || 'Không thể xử lý ảnh đã chọn.');

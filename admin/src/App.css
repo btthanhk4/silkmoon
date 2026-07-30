@@ -1814,6 +1814,43 @@ select.customization-filter {
   border: 1px solid #dbe3ea;
 }
 
+.review-detail-image {
+  position: relative;
+}
+
+.review-detail-image > button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 34, 63, .88);
+  color: white;
+  cursor: pointer;
+}
+
+.review-image-upload {
+  min-height: 44px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed #9aabba;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--navy);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.review-image-upload.disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 .content-settings {
   display: grid;
   gap: 18px;

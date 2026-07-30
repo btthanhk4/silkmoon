@@ -7,6 +7,7 @@ import footerLogo from "../../../frontend/src/assets/logoweb.silkmoon.png";
 import headerLogo from "../../../frontend/src/assets/xanh_ngang.png";
 import Pagination from "./Pagination";
 import ListSearch, { ListFilter, useListFilter, useListSearch } from "./ListSearch";
+import { prepareUploadImage } from "../utils/prepareUploadImage";
 const LIST_PAGE_SIZE = 10;
 const money = (v) =>
   new Intl.NumberFormat("vi-VN", {
@@ -14,17 +15,79 @@ const money = (v) =>
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(v || 0);
+const MAX_REVIEW_IMAGES = 4;
 export function ReviewsManager() {
   const [items, setItems] = useState([]),
+    [products, setProducts] = useState([]),
     [selected, setSelected] = useState(null),
+    [error, setError] = useState(""),
+    [isSaving, setIsSaving] = useState(false),
+    [isUploadingImages, setIsUploadingImages] = useState(false),
     [page, setPage] = useState(1);
-  const load = () =>
-    adminApi
-      .getReviews()
-      .then((data) => setItems(Array.isArray(data) ? data : data?.items || []));
+  const load = () => Promise.all([
+    adminApi.getReviews(),
+    adminApi.getProducts({ page: 1, limit: 500 }),
+  ]).then(([reviewData, productData]) => {
+    setItems(Array.isArray(reviewData) ? reviewData : reviewData?.items || []);
+    setProducts(Array.isArray(productData) ? productData : productData?.items || []);
+  }).catch((loadError) => setError(loadError.message || "Không thể tải dữ liệu đánh giá."));
   useEffect(() => {
     load();
   }, []);
+  const productName = (productId) => products.find((product) => (product._id || product.id) === productId)?.name || productId;
+  const openCreate = () => {
+    setError("");
+    setSelected({
+      _isNew: true,
+      productId: products[0]?._id || products[0]?.id || "",
+      authorName: "",
+      rating: 5,
+      comment: "",
+      isVerified: true,
+      images: [],
+    });
+  };
+  const saveReview = async () => {
+    setIsSaving(true);
+    setError("");
+    const payload = {
+      productId: selected.productId,
+      authorName: selected.authorName.trim(),
+      rating: Number(selected.rating),
+      comment: selected.comment.trim(),
+      isVerified: selected.isVerified !== false,
+      images: selected.images || [],
+    };
+    try {
+      if (selected._isNew) await adminApi.createReview(payload);
+      else await adminApi.updateReview(selected._id, payload);
+      setSelected(null);
+      await load();
+    } catch (saveError) {
+      setError(saveError.message || "Không thể lưu đánh giá.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  const uploadReviewImages = async (event) => {
+    const remaining = MAX_REVIEW_IMAGES - (selected.images?.length || 0);
+    const files = Array.from(event.target.files || []).slice(0, remaining);
+    event.target.value = "";
+    if (!files.length) {
+      if (remaining <= 0) setError(`Mỗi đánh giá có tối đa ${MAX_REVIEW_IMAGES} ảnh.`);
+      return;
+    }
+    setIsUploadingImages(true);
+    setError("");
+    try {
+      const urls = await Promise.all(files.map(async (file) => adminApi.uploadReviewImage(await prepareUploadImage(file))));
+      setSelected((current) => ({ ...current, images: [...(current.images || []), ...urls].slice(0, MAX_REVIEW_IMAGES) }));
+    } catch (uploadError) {
+      setError(uploadError.message || "Không thể tải ảnh đánh giá lên.");
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
   const { query, setQuery, filteredItems: searchedItems } = useListSearch(items);
   const { filter, setFilter, filteredItems } = useListFilter(searchedItems, (item) => item.isVerified !== false ? "verified" : "pending");
   return (
@@ -34,13 +97,15 @@ export function ReviewsManager() {
           <h2>Đánh giá sản phẩm</h2>
           <p>{items.length} đánh giá</p>
         </div>
-        <div className="list-controls"><ListSearch value={query} onChange={(value) => { setQuery(value); setPage(1); }} placeholder="Tìm đánh giá…" /><ListFilter value={filter} onChange={(value) => { setFilter(value); setPage(1); }} options={[{value:"verified",label:"Đã duyệt"},{value:"pending",label:"Chờ duyệt"}]} /></div>
+        <div className="list-controls"><ListSearch value={query} onChange={(value) => { setQuery(value); setPage(1); }} placeholder="Tìm đánh giá…" /><ListFilter value={filter} onChange={(value) => { setFilter(value); setPage(1); }} options={[{value:"verified",label:"Đã duyệt"},{value:"pending",label:"Chờ duyệt"}]} /><button className="primary-button" type="button" onClick={openCreate} disabled={!products.length}><span className="material-symbols-outlined">add</span>Thêm đánh giá</button></div>
       </div>
+      {error && !selected && <p className="form-error">{error}</p>}
       <div className="table-wrap">
         <table className="data-table">
           <thead>
             <tr>
               <th>KHÁCH HÀNG</th>
+              <th>SẢN PHẨM</th>
               <th>SAO</th>
               <th>NỘI DUNG</th>
               <th>TRẠNG THÁI</th>
@@ -51,6 +116,7 @@ export function ReviewsManager() {
             {filteredItems.slice((page - 1) * LIST_PAGE_SIZE, page * LIST_PAGE_SIZE).map((x) => (
               <tr key={x._id}>
                 <td className="cell-primary">{x.authorName}</td>
+                <td>{productName(x.productId)}</td>
                 <td>{"★".repeat(x.rating)}</td>
                 <td>{x.comment.slice(0, 80)}</td>
                 <td>
@@ -76,59 +142,34 @@ export function ReviewsManager() {
         <div className="modal-backdrop">
           <div className="category-modal">
             <div className="modal-header">
-              <h2>Chi tiết đánh giá</h2>
-              <button className="icon-button" onClick={() => setSelected(null)}>
+              <h2>{selected._isNew ? "Thêm đánh giá" : "Chi tiết đánh giá"}</h2>
+              <button className="icon-button" onClick={() => { setSelected(null); setError(""); }}>
                 ×
               </button>
             </div>
             <div className="review-detail">
+              <label className="modal-field"><span>Sản phẩm</span><select value={selected.productId} onChange={(event) => setSelected({ ...selected, productId: event.target.value })}><option value="" disabled>Chọn sản phẩm</option>{products.map((product) => <option value={product._id || product.id} key={product._id || product.id}>{product.name}</option>)}</select></label>
               <label className="modal-field"><span>Tên khách hàng</span><input value={selected.authorName} onChange={(event) => setSelected({ ...selected, authorName: event.target.value })} /></label>
               <label className="modal-field"><span>Số sao</span><select value={selected.rating} onChange={(event) => setSelected({ ...selected, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((rating) => <option value={rating} key={rating}>{rating} sao</option>)}</select></label>
+              <label className="modal-field"><span>Trạng thái hiển thị</span><select value={selected.isVerified === false ? "pending" : "verified"} onChange={(event) => setSelected({ ...selected, isVerified: event.target.value === "verified" })}><option value="verified">Đã duyệt — hiển thị ngoài website</option><option value="pending">Chờ duyệt — tạm ẩn</option></select></label>
               <label className="modal-field"><span>Nội dung đánh giá</span><textarea rows="5" value={selected.comment} onChange={(event) => setSelected({ ...selected, comment: event.target.value })} /></label>
-              {!!selected.images?.length && (
-                <div className="review-detail-images">
-                  {selected.images.map((image, index) => (
-                    <a href={image} target="_blank" rel="noreferrer" key={image}>
-                      <img src={image} alt={`Ảnh đánh giá ${index + 1}`} />
-                    </a>
-                  ))}
-                </div>
-              )}
-              <small>Mã sản phẩm: {selected.productId}</small>
+              <div className="modal-field"><span>Ảnh đánh giá ({selected.images?.length || 0}/{MAX_REVIEW_IMAGES})</span><label className={`review-image-upload ${isUploadingImages || selected.images?.length >= MAX_REVIEW_IMAGES ? "disabled" : ""}`}><span className="material-symbols-outlined">add_photo_alternate</span>{isUploadingImages ? "Đang tải ảnh…" : "Chọn ảnh"}<input type="file" accept="image/*,.heic,.heif" multiple hidden disabled={isUploadingImages || selected.images?.length >= MAX_REVIEW_IMAGES} onChange={uploadReviewImages} /></label></div>
+              {!!selected.images?.length && <div className="review-detail-images">{selected.images.map((image, index) => <div className="review-detail-image" key={`${image}-${index}`}><a href={image} target="_blank" rel="noreferrer"><img src={image} alt={`Ảnh đánh giá ${index + 1}`} /></a><button type="button" aria-label={`Xóa ảnh ${index + 1}`} onClick={() => setSelected((current) => ({ ...current, images: current.images.filter((_, imageIndex) => imageIndex !== index) }))}>×</button></div>)}</div>}
+              {error && <p className="form-error">{error}</p>}
             </div>
             <div className="modal-actions">
-              <button
+              {!selected._isNew && <button
                 className="secondary-button"
-                onClick={() =>
-                  adminApi.deleteReview(selected._id).then(() => {
-                    setSelected(null);
-                    load();
-                  })
-                }
+                onClick={() => adminApi.deleteReview(selected._id).then(() => { setSelected(null); load(); }).catch((deleteError) => setError(deleteError.message || "Không thể xóa đánh giá."))}
               >
                 Xóa
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() =>
-                  adminApi
-                    .updateReview(selected._id, {
-                      isVerified: !selected.isVerified,
-                    })
-                    .then(() => {
-                      setSelected(null);
-                      load();
-                    })
-                }
-              >
-                {selected.isVerified ? "Bỏ duyệt" : "Duyệt"}
-              </button>
+              </button>}
               <button
                 className="primary-button"
-                disabled={!selected.authorName.trim() || !selected.comment.trim()}
-                onClick={() => adminApi.updateReview(selected._id, { authorName: selected.authorName.trim(), rating: Number(selected.rating), comment: selected.comment.trim() }).then(() => { setSelected(null); load(); })}
+                disabled={isSaving || isUploadingImages || !selected.productId || !selected.authorName.trim() || !selected.comment.trim()}
+                onClick={saveReview}
               >
-                Lưu chỉnh sửa
+                {isSaving ? "Đang lưu…" : selected._isNew ? "Tạo đánh giá" : "Lưu chỉnh sửa"}
               </button>
             </div>
           </div>

@@ -48,7 +48,20 @@ const apiRequest = async (path, options = {}) => {
 };
 
 export const adminApi = {
-  getReviews: () => apiRequest("/reviews"),
+  getReviews: () => apiRequest("/reviews?limit=500"),
+  createReview: (data) =>
+    apiRequest("/reviews/admin", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  uploadReviewImage: (image) => withUploadSlot(async () => {
+    const result = await apiRequest("/ar/upload", {
+      method: "POST",
+      body: JSON.stringify({ image, usage: "review" }),
+    });
+    if (!result?.url) throw new Error("Không thể tải ảnh đánh giá lên.");
+    return result.url;
+  }),
   updateReview: (id, data) =>
     apiRequest(`/reviews/${id}`, {
       method: "PATCH",
@@ -104,7 +117,13 @@ export const adminApi = {
     }),
   deleteBlogCategory: (id) =>
     apiRequest(`/blog/admin/categories/${id}`, { method: "DELETE" }),
-  getBlogComments: () => apiRequest("/blog/admin/comments"),
+  getBlogComments: () => apiRequest("/blog/admin/comments?limit=500"),
+  createBlogComment: (data) => apiRequest("/blog/admin/comments", { method: "POST", body: JSON.stringify(data) }),
+  uploadBlogCommentImage: (image) => withUploadSlot(async () => {
+    const result = await apiRequest("/ar/upload", { method: "POST", body: JSON.stringify({ image, usage: "comment" }) });
+    if (!result?.url) throw new Error("Không thể tải ảnh bình luận lên.");
+    return result.url;
+  }),
   updateBlogComment: (id, data) =>
     apiRequest(`/blog/admin/comments/${id}`, {
       method: "PATCH",

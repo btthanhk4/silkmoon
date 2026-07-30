@@ -66,6 +66,31 @@ export class ARController {
     }
   }
 
+  @Get('download-image')
+  async downloadImage(@Query('url') url: string, @Query('filename') filename: string, @Res() res: Response) {
+    if (!url) return res.status(HttpStatus.BAD_REQUEST).send('URL is required');
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'res.cloudinary.com') {
+        return res.status(HttpStatus.FORBIDDEN).send('Image URL is not allowed');
+      }
+      const imageResponse = await fetch(url);
+      if (!imageResponse.ok) throw new Error('Failed to fetch image');
+      const safeFilename = String(filename || 'Silkmoon_AR.jpg')
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .replace(/\.{2,}/g, '.')
+        .slice(0, 100) || 'Silkmoon_AR.jpg';
+      const buffer = Buffer.from(await imageResponse.arrayBuffer());
+      res.setHeader('Content-Type', imageResponse.headers.get('content-type') || 'image/jpeg');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+      res.setHeader('Content-Length', String(buffer.length));
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      return res.send(buffer);
+    } catch {
+      return res.status(HttpStatus.BAD_GATEWAY).send('Unable to download image');
+    }
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('upload-usdz')
   @UseInterceptors(FileInterceptor('file', {
@@ -112,23 +137,28 @@ export class ARController {
   }
 
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Post('upload')
-  async uploadImage(@Body() body: { image: string; usage?: 'product' | 'ar' | 'review' }) {
+  async uploadImage(@Body() body: { image: string; usage?: 'product' | 'ar' | 'review' | 'comment' }) {
     if (!body.image) throw new HttpException('Missing image data', HttpStatus.BAD_REQUEST);
     try {
       const isProductImage = body.usage === 'product';
       const folder = isProductImage
         ? 'silkmoon_products'
-        : body.usage === 'review'
-          ? 'silkmoon_reviews'
-          : 'silkmoon_ar';
+        : body.usage === 'comment'
+          ? 'silkmoon_blog_comments'
+          : body.usage === 'review'
+            ? 'silkmoon_reviews'
+            : 'silkmoon_ar';
       const url = await this.arService.uploadImageToCloudinary(
         body.image,
         folder,
         isProductImage,
       );
-      return { success: true, url };
+      const deliveryUrl = body.usage === 'review' || body.usage === 'comment'
+        ? url.replace('/upload/', '/upload/f_auto,q_auto/')
+        : url;
+      return { success: true, url: deliveryUrl };
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -186,7 +216,7 @@ export class ARController {
   }
 
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { limit: 2, ttl: 60000 } }) // 2 requests per minute per IP
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute per IP
   @Post('generate-preview')
   async generatePreview(@Body() body: { imageUrl?: string; image?: string; color: string; fabricName?: string }) {
     if (!body.image && !body.imageUrl) {

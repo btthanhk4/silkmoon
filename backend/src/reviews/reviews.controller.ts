@@ -6,6 +6,7 @@ import { UserRole } from '../users/schemas/user.schema';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { AdminCreateReviewDto } from './dto/admin-create-review.dto';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -30,6 +31,13 @@ export class ReviewsController {
   @Post()
   create(@Body() dto: CreateReviewDto) {
     return this.reviewsService.create(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post('admin')
+  createByAdmin(@Body() dto: AdminCreateReviewDto) {
+    return this.reviewsService.createByAdmin(dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard) @Roles(UserRole.ADMIN) @Get()

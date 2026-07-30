@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { blogApi } from "../services/api";
 import BlogLayout from "../component/blog/BlogLayouts";
+import BlogComments from "../component/blog/BlogComments";
 export default function BlogDetail() {
   const { id } = useParams(),
     [post, setPost] = useState(null),
@@ -31,6 +32,7 @@ export default function BlogDetail() {
   return (
     <main className="pt-28 pb-20 bg-white min-h-screen">
       <BlogLayout post={post} category={category} />
+      <BlogComments postId={post._id || post.id} />
     </main>
   );
 }

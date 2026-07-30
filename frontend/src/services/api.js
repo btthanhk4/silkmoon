@@ -79,6 +79,7 @@ export const blogApi = {
   },
   getPost: (id) => request(`/blog/posts/${id}`),
   getCategories: () => request('/blog/categories'),
+  getComments: (postId) => request(`/blog/comments/${postId}`),
   createComment: (data) => request('/blog/comments', { method: 'POST', body: JSON.stringify(data) }),
 };
 export const settingsApi = {
@@ -128,6 +129,10 @@ export const reviewsApi = {
 
 // ── AR ────────────────────────────────────────────────────
 export const arApi = {
+  getDownloadUrl: (imageUrl, filename = 'Silkmoon_AR.jpg') => {
+    const params = new URLSearchParams({ url: imageUrl, filename });
+    return `${BASE_URL}/ar/download-image?${params}`;
+  },
   detectBed: (data) =>
     request('/ar/detect-bed', {
       method: 'POST',

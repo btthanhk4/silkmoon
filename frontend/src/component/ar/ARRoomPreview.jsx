@@ -10,6 +10,7 @@ const MODES = { AI: 'ai', AR: 'ar' };
 const MAX_UPLOAD_SIZE = 30 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 2048;
 const IMAGE_FILE_EXTENSION = /\.(jpe?g|png|webp|heic|heif)$/i;
+const AR_RETRY_DELAY_SECONDS = 20;
 
 const colorDistance = (firstHex, secondHex) => {
   const parse = (hex) => {
@@ -162,7 +163,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
       if (isQuota) {
         // Start countdown auto-retry
         setAiError('quota_exceeded');
-        let remaining = 60;
+        let remaining = AR_RETRY_DELAY_SECONDS;
         setRetryCountdown(remaining);
         const timer = setInterval(() => {
           remaining -= 1;
@@ -231,23 +232,23 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
     }
   };
 
-  const downloadAiImage = async () => {
+  const downloadAiImage = () => {
     if (!aiImage) return;
-    try {
-      const response = await fetch(aiImage);
-      if (!response.ok) throw new Error('Không thể tải ảnh');
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = `Silkmoon_AR_${fabric.label.replace(/\s+/g, '_')}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
-    } catch {
-      alert('Không thể tải ảnh xuống. Vui lòng thử lại.');
+    const filename = `Silkmoon_AR_${fabric.label.replace(/\s+/g, '_')}.jpg`;
+    const downloadUrl = arApi.getDownloadUrl(aiImage, filename);
+    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      const opened = window.open(downloadUrl, '_blank');
+      if (!opened) window.location.assign(downloadUrl);
+      return;
     }
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   if (!isOpen) return null;
@@ -408,7 +409,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                           <div className="w-32 h-1 bg-slate-deep/10 rounded-full overflow-hidden mb-2">
                             <div
                               className="h-full bg-slate-deep transition-all duration-1000"
-                              style={{ width: `${((60 - retryCountdown) / 60) * 100}%` }}
+                              style={{ width: `${((AR_RETRY_DELAY_SECONDS - retryCountdown) / AR_RETRY_DELAY_SECONDS) * 100}%` }}
                             />
                           </div>
                           <p className="font-mono text-2xl font-bold text-slate-deep text-center">{retryCountdown}s</p>

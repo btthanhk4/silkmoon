@@ -1,48 +1,27 @@
 import { useEffect, useState } from 'react';
 import { reviewsApi } from '../services/api';
 
-const fallbackFeedbacks = [
-    {
-      text: "Bộ chăn ga Tencel của SILKMOON thực sự làm thay đổi giấc ngủ của mình. Vải cực kỳ mềm mại, mát rượi vào mùa hè và giữ ấm tốt vào mùa đông. Chắc chắn sẽ ủng hộ thêm!",
-      author: "Mai Anh",
-      location: "TP. Hồ Chí Minh",
-      initial: "M",
-      color: "bg-sage-haze"
-    },
-    {
-      text: "Mình rất khó ngủ do hay bị dị ứng bụi vải. Từ ngày đổi sang dùng ga giường của SILKMOON thì tình trạng giảm hẳn, sáng dậy thấy tinh thần vô cùng sảng khoái.",
-      author: "Hoàng Hải",
-      location: "Hà Nội",
-      initial: "H",
-      color: "bg-slate-deep"
-    },
-    {
-      text: "Thích nhất là thiết kế tối giản, tông màu trơn cực kỳ sang trọng và dễ phối với nội thất phòng ngủ. Giao hàng nhanh và đóng gói hộp quà tặng rất chỉn chu.",
-      author: "Lan Phương",
-      location: "Đà Nẵng",
-      initial: "L",
-      color: "bg-[#8C9EA1]"
-    }
-];
-
 const feedbackColors = ['bg-sage-haze', 'bg-slate-deep', 'bg-[#8C9EA1]'];
 
 export default function CustomerFeedback() {
-  const [feedbacks, setFeedbacks] = useState(fallbackFeedbacks);
+  // Homepage reviews must come from the database so admin edits are reflected.
+  const [feedbacks, setFeedbacks] = useState(null);
 
   useEffect(() => {
     reviewsApi.getFeatured(6).then((items) => {
-      if (!Array.isArray(items) || !items.length) return;
-      setFeedbacks(items.map((review, index) => ({
+      setFeedbacks((Array.isArray(items) ? items : []).map((review, index) => ({
         text: review.comment,
         author: review.authorName,
         location: 'Khách hàng Silkmoon',
         initial: review.authorName?.trim()?.charAt(0)?.toUpperCase() || 'S',
         color: feedbackColors[index % feedbackColors.length],
         rating: review.rating,
+        images: review.images || [],
       })));
-    }).catch(() => null);
+    }).catch(() => setFeedbacks([]));
   }, []);
+
+  if (!feedbacks?.length) return null;
 
   // Nhân bản mảng để tạo hiệu ứng cuộn vô tận mượt mà
   const allFeedbacks = [...feedbacks, ...feedbacks, ...feedbacks, ...feedbacks];
@@ -73,6 +52,7 @@ export default function CustomerFeedback() {
                   <span key={star} className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: star <= (item.rating || 5) ? "'FILL' 1" : "'FILL' 0" }}>star</span>
                 ))}
               </div>
+              {!!item.images?.length && <div className="mb-5 flex gap-2 overflow-hidden">{item.images.slice(0, 3).map((image, imageIndex) => <img src={image} alt={`Ảnh đánh giá ${imageIndex + 1}`} className="h-20 min-w-0 flex-1 rounded-md object-cover" key={`${image}-${imageIndex}`} />)}</div>}
               <p className="font-body-md text-slate-deep/80 mb-8 italic flex-1">
                 "{item.text}"
               </p>

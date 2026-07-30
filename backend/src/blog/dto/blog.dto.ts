@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 
 export class CreateBlogPostDto {
@@ -67,12 +67,29 @@ export class CreateCommentDto {
   @IsNotEmpty()
   authorName: string;
 
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
   @IsString()
   @IsNotEmpty()
   content: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(4)
+  @IsUrl({}, { each: true })
+  images?: string[];
 }
 
 export class UpdateCommentDto extends PartialType(CreateCommentDto) {
   @IsOptional()
+  @IsIn(['pending', 'approved', 'spam'])
+  status?: string;
+}
+
+export class AdminCreateCommentDto extends CreateCommentDto {
+  @IsOptional()
+  @IsIn(['pending', 'approved', 'spam'])
   status?: string;
 }

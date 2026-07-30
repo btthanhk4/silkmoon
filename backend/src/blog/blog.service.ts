@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { BlogPost, BlogPostDocument } from './schemas/blog-post.schema';
 import { BlogCategory, BlogCategoryDocument } from './schemas/blog-category.schema';
 import { BlogComment, BlogCommentDocument } from './schemas/blog-comment.schema';
-import { CreateBlogPostDto, UpdateBlogPostDto, CreateBlogCategoryDto, UpdateBlogCategoryDto, CreateCommentDto, UpdateCommentDto } from './dto/blog.dto';
+import { AdminCreateCommentDto, CreateBlogPostDto, UpdateBlogPostDto, CreateBlogCategoryDto, UpdateBlogCategoryDto, CreateCommentDto, UpdateCommentDto } from './dto/blog.dto';
 @Injectable()
 export class BlogService implements OnModuleInit {
   constructor(@InjectModel(BlogPost.name) private posts: Model<BlogPostDocument>, @InjectModel(BlogCategory.name) private categories: Model<BlogCategoryDocument>, @InjectModel(BlogComment.name) private comments: Model<BlogCommentDocument>) {}
@@ -94,8 +94,16 @@ export class BlogService implements OnModuleInit {
     return { items, total, page, totalPages: Math.ceil(total / limit) };
   }
 
+  async listApprovedComments(postId: string) {
+    return this.comments.find({ postId, status: 'approved' }).sort({ createdAt: -1 }).lean();
+  }
+
   async createComment(data: CreateCommentDto) {
-    return this.comments.create(data);
+    return this.comments.create({ ...data, authorName: data.authorName.trim(), content: data.content.trim(), status: 'pending' });
+  }
+
+  async createCommentByAdmin(data: AdminCreateCommentDto) {
+    return this.comments.create({ ...data, authorName: data.authorName.trim(), content: data.content.trim(), status: data.status || 'approved' });
   }
 
   async updateComment(id: string, data: UpdateCommentDto) {

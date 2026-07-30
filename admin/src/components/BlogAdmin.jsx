@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { adminApi } from "../services/api";
 import Pagination from "./Pagination";
 import ListSearch, { ListFilter, useListFilter, useListSearch } from "./ListSearch";
+import { prepareUploadImage } from "../utils/prepareUploadImage";
 const toItems = (data) => (Array.isArray(data) ? data : data?.items || []);
 const slugify = (text) =>
   text
@@ -11,6 +12,7 @@ const slugify = (text) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+const MAX_COMMENT_IMAGES = 4;
 
 export function ProductReviewsAdmin() {
   const [items, setItems] = useState([]);
@@ -57,46 +59,79 @@ export function ProductReviewsAdmin() {
 }
 export function BlogCommentsAdmin() {
   const [items, setItems] = useState([]);
-  const load = () =>
-    adminApi.getBlogComments().then((data) => setItems(toItems(data)));
+  const [posts, setPosts] = useState([]);
+  const [form, setForm] = useState(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const load = () => Promise.all([adminApi.getBlogComments(), adminApi.getBlogPosts({ page: 1, limit: 500 })]).then(([commentData, postData]) => {
+    setItems(toItems(commentData));
+    setPosts(toItems(postData));
+  }).catch((loadError) => setError(loadError.message || "Không thể tải bình luận."));
   useEffect(() => {
     load();
   }, []);
-  return (
+  const postName = (postId) => posts.find((post) => (post._id || post.id) === postId)?.title || postId;
+  const openCreate = () => setForm({ postId: posts[0]?._id || posts[0]?.id || "", authorName: "", email: "", content: "", status: "approved", images: [] });
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    const payload = { postId: form.postId, authorName: form.authorName.trim(), email: form.email?.trim() || undefined, content: form.content.trim(), status: form.status, images: form.images || [] };
+    try {
+      if (form._id) await adminApi.updateBlogComment(form._id, payload);
+      else await adminApi.createBlogComment(payload);
+      setForm(null);
+      await load();
+    } catch (saveError) { setError(saveError.message || "Không thể lưu bình luận."); }
+    finally { setSaving(false); }
+  };
+  const uploadImages = async (event) => {
+    const files = Array.from(event.target.files || []).slice(0, MAX_COMMENT_IMAGES - (form.images?.length || 0));
+    event.target.value = "";
+    setUploading(true);
+    setError("");
+    try {
+      const urls = await Promise.all(files.map(async (file) => adminApi.uploadBlogCommentImage(await prepareUploadImage(file))));
+      setForm((current) => ({ ...current, images: [...(current.images || []), ...urls].slice(0, MAX_COMMENT_IMAGES) }));
+    } catch (uploadError) { setError(uploadError.message || "Không thể tải ảnh lên."); }
+    finally { setUploading(false); }
+  };
+  return <>
     <AdminTable
       title="Bình luận blog"
       subtitle={`${items.length} bình luận`}
-      headers={["NGƯỜI GỬI", "NỘI DUNG", "TRẠNG THÁI", "THAO TÁC"]}
+      headers={["NGƯỜI GỬI", "BÀI VIẾT", "NỘI DUNG", "TRẠNG THÁI", "THAO TÁC"]}
       rows={items.map((x) => [
         x.authorName,
+        postName(x.postId),
         x.content,
         <span
           className={`status ${x.status === "approved" ? "completed" : ""}`}
         >
-          {x.status === "approved" ? "Đã duyệt" : "Chờ duyệt"}
+          {x.status === "approved" ? "Đã duyệt" : x.status === "spam" ? "Spam" : "Chờ duyệt"}
         </span>,
         <>
-          <button
-            className="action-button"
-            onClick={() =>
-              adminApi
-                .updateBlogComment(x._id, {
-                  status: x.status === "approved" ? "pending" : "approved",
-                })
-                .then(load)
-            }
-          >
-            {x.status === "approved" ? "Bỏ duyệt" : "Duyệt"}
-          </button>
+          <button className="action-button" onClick={() => { setError(""); setForm({ ...x, images: x.images || [] }); }}>Chỉnh sửa</button>
           <Delete
-            onClick={() => adminApi.deleteBlogComment(x._id).then(load)}
+            onClick={() => confirm("Xóa bình luận này?") && adminApi.deleteBlogComment(x._id).then(load)}
           />
         </>,
       ])}
-      filterIndex={2}
-      filterOptions={[{value:"Đã duyệt",label:"Đã duyệt"},{value:"Chờ duyệt",label:"Chờ duyệt"}]}
+      filterIndex={3}
+      filterOptions={[{value:"Đã duyệt",label:"Đã duyệt"},{value:"Chờ duyệt",label:"Chờ duyệt"},{value:"Spam",label:"Spam"}]}
+      headerAction={<button className="primary-button" onClick={openCreate} disabled={!posts.length}><span className="material-symbols-outlined">add</span>Thêm bình luận</button>}
     />
-  );
+    {form && <div className="modal-backdrop"><div className="category-modal"><div className="modal-header"><h2>{form._id ? "Chỉnh sửa" : "Thêm"} bình luận blog</h2><button className="icon-button" onClick={() => { setForm(null); setError(""); }}>×</button></div><div className="review-detail">
+      <label className="modal-field"><span>Bài viết</span><select value={form.postId} onChange={(event) => setForm({ ...form, postId: event.target.value })}>{posts.map((post) => <option value={post._id || post.id} key={post._id || post.id}>{post.title}</option>)}</select></label>
+      <label className="modal-field"><span>Tên người gửi</span><input value={form.authorName} onChange={(event) => setForm({ ...form, authorName: event.target.value })} /></label>
+      <label className="modal-field"><span>Email (không bắt buộc)</span><input type="email" value={form.email || ""} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+      <label className="modal-field"><span>Trạng thái</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="approved">Đã duyệt — hiển thị ngoài website</option><option value="pending">Chờ duyệt — tạm ẩn</option><option value="spam">Spam</option></select></label>
+      <label className="modal-field"><span>Nội dung</span><textarea rows="5" value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} /></label>
+      <div className="modal-field"><span>Ảnh bình luận ({form.images?.length || 0}/{MAX_COMMENT_IMAGES}) — không bắt buộc</span><label className={`review-image-upload ${uploading || form.images?.length >= MAX_COMMENT_IMAGES ? "disabled" : ""}`}><span className="material-symbols-outlined">add_photo_alternate</span>{uploading ? "Đang tải…" : "Chọn ảnh"}<input hidden type="file" accept="image/*,.heic,.heif" multiple disabled={uploading || form.images?.length >= MAX_COMMENT_IMAGES} onChange={uploadImages} /></label></div>
+      {!!form.images?.length && <div className="review-detail-images">{form.images.map((image, index) => <div className="review-detail-image" key={`${image}-${index}`}><a href={image} target="_blank" rel="noreferrer"><img src={image} alt={`Ảnh bình luận ${index + 1}`} /></a><button type="button" onClick={() => setForm((current) => ({ ...current, images: current.images.filter((_, imageIndex) => imageIndex !== index) }))}>×</button></div>)}</div>}
+      {error && <p className="form-error">{error}</p>}
+    </div><div className="modal-actions"><button className="primary-button" disabled={saving || uploading || !form.postId || !form.authorName.trim() || !form.content.trim()} onClick={save}>{saving ? "Đang lưu…" : form._id ? "Lưu chỉnh sửa" : "Tạo bình luận"}</button></div></div></div>}
+  </>;
 }
 export function BlogCategoriesAdmin() {
   const [items, setItems] = useState([]);
@@ -349,7 +384,7 @@ const cellText = (value) => {
   if (Array.isArray(value)) return value.map(cellText).join(" ");
   return cellText(value.props?.children);
 };
-function AdminTable({ title, subtitle, headers, rows, filterIndex = 0, filterOptions = [] }) {
+function AdminTable({ title, subtitle, headers, rows, filterIndex = 0, filterOptions = [], headerAction = null }) {
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const { query, setQuery, filteredItems: searchedItems } = useListSearch(rows);
@@ -362,6 +397,7 @@ function AdminTable({ title, subtitle, headers, rows, filterIndex = 0, filterOpt
           <p>{subtitle}</p>
         </div>
         <div className="list-controls"><ListSearch value={query} onChange={(value) => { setQuery(value); setPage(1); }} />{filterOptions.length > 0 && <ListFilter value={filter} onChange={(value) => { setFilter(value); setPage(1); }} options={filterOptions} />}</div>
+        {headerAction}
       </div>
       <div className="table-wrap">
         <table className="data-table">

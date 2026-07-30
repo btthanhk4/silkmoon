@@ -1,6 +1,11 @@
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
 
 export class UpdateReviewDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  productId?: string;
+
   @IsOptional()
   @IsString()
   @IsNotEmpty()
@@ -16,6 +21,12 @@ export class UpdateReviewDto {
   @IsString()
   @IsNotEmpty()
   comment?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(4)
+  @IsUrl({}, { each: true })
+  images?: string[];
 
   @IsOptional()
   @IsBoolean()

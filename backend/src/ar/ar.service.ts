@@ -409,7 +409,7 @@ Output: The edited bedroom photo with the entire bedding set color changed to ${
 
     if (quotaExceeded) {
       // Throw a specific error the frontend can detect and show a retry countdown
-      const err = new Error('QUOTA_EXCEEDED: Image generation quota reached. Please wait ~60 seconds and try again.');
+      const err = new Error('QUOTA_EXCEEDED: Image generation quota reached. Please wait ~20 seconds and try again.');
       (err as any).code = 'QUOTA_EXCEEDED';
       throw err;
     }
