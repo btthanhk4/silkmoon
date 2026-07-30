@@ -7,6 +7,22 @@ import arLoadingUrl from '../../assets/ar-loading.svg';
 
 // ── Mode: 'ai' = AI-generated image (AR Try on), 'ar' = Realtime WebXR
 const MODES = { AI: 'ai', AR: 'ar' };
+const MAX_UPLOAD_SIZE = 30 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 2048;
+const IMAGE_FILE_EXTENSION = /\.(jpe?g|png|webp|heic|heif)$/i;
+
+const colorDistance = (firstHex, secondHex) => {
+  const parse = (hex) => {
+    const value = String(hex || '').replace('#', '');
+    const normalized = value.length === 3 ? value.split('').map((part) => part + part).join('') : value;
+    if (!/^[0-9a-f]{6}$/i.test(normalized)) return null;
+    return [0, 2, 4].map((index) => parseInt(normalized.slice(index, index + 2), 16));
+  };
+  const first = parse(firstHex);
+  const second = parse(secondHex);
+  if (!first || !second) return Number.POSITIVE_INFINITY;
+  return Math.sqrt(first.reduce((total, channel, index) => total + ((channel - second[index]) ** 2), 0));
+};
 
 const safeArErrorMessage = (error) => {
   const message = String(error?.message || '').toLowerCase();
@@ -22,7 +38,7 @@ const safeArErrorMessage = (error) => {
   return 'Không thể tạo ảnh lúc này. Anh/chị vui lòng thử lại sau.';
 };
 
-export default function ARRoomPreview({ isOpen, onClose, productColor, productColors }) {
+export default function ARRoomPreview({ isOpen, onClose, productColor, productColors, guideTitle, usageTips }) {
   const availableFabrics = useMemo(() => {
     const configuredColors = (productColors || [])
       .filter((color) => color?.id && color?.hex)
@@ -32,32 +48,76 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
   const selectedProductColorId = typeof productColor === 'string' ? productColor : productColor?.id;
   const [roomImg, setRoomImg]               = useState(null);
   const [roomImgSrc, setRoomImgSrc]         = useState(null); // original base64 for AI
+  const [roomImageUrl, setRoomImageUrl]     = useState('');
   const [activeFabricId, setActiveFabricId] = useState(selectedProductColorId || availableFabrics[0]?.id || 'champagne');
   const [opacity, setOpacity]               = useState(1.0); // Changed to 1.0 to fully hide the bed
   const [mode, setMode]                     = useState(MODES.AI);
   const [isComparing, setIsComparing]       = useState(false);
+  const [comparisonImage, setComparisonImage] = useState(null);
+  const [comparisonFabricId, setComparisonFabricId] = useState('');
+  const [isGeneratingComparison, setIsGeneratingComparison] = useState(false);
   const [aiImage, setAiImage]               = useState(null);
   const [isGenerating, setIsGenerating]     = useState(false);
   const [aiError, setAiError]               = useState(null);
   const [retryCountdown, setRetryCountdown] = useState(null);
   const [shareUrl, setShareUrl]             = useState('');
   const [shareCopied, setShareCopied]       = useState(false);
+  const nearestFabric = useMemo(() => {
+    const active = availableFabrics.find((fabric) => fabric.id === activeFabricId);
+    if (!active) return null;
+    return availableFabrics
+      .filter((fabric) => fabric.id !== active.id)
+      .sort((first, second) => colorDistance(active.hex, first.hex) - colorDistance(active.hex, second.hex))[0] || null;
+  }, [activeFabricId, availableFabrics]);
 
   // ── Load image file ──────────────────────────────────────
   const loadImage = (file) => {
-    if (!file?.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const src = ev.target.result;
-      setRoomImgSrc(src);
-      const img = new Image();
-      img.onload = () => {
+    const isImage = file && (file.type.startsWith('image/') || IMAGE_FILE_EXTENSION.test(file.name));
+    if (!isImage) {
+      setAiError('Định dạng ảnh chưa được hỗ trợ. Vui lòng chọn ảnh JPG, PNG, WebP, HEIC hoặc HEIF.');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setAiError('Ảnh có dung lượng quá lớn. Vui lòng chọn ảnh nhỏ hơn 30 MB.');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const sourceWidth = img.naturalWidth || img.width;
+        const sourceHeight = img.naturalHeight || img.height;
+        if (!sourceWidth || !sourceHeight) throw new Error('Invalid image dimensions');
+
+        const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(sourceWidth, sourceHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+        canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas is unavailable');
+
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const normalizedSrc = canvas.toDataURL('image/jpeg', 0.86);
         setRoomImg(img);
-        runGenerate(src);
-      };
-      img.src = src;
+        setRoomImgSrc(normalizedSrc);
+        setRoomImageUrl('');
+        setComparisonImage(null);
+        setComparisonFabricId('');
+        setIsComparing(false);
+        runGenerate(normalizedSrc);
+      } catch {
+        setAiError('Không thể đọc ảnh này trên trình duyệt. Vui lòng thử ảnh khác hoặc chọn định dạng JPG.');
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
     };
-    reader.readAsDataURL(file);
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setAiError('Không thể đọc ảnh này trên iPhone. Vui lòng thử ảnh JPG hoặc đổi Camera sang chế độ “Tương thích nhất”.');
+    };
+    img.src = objectUrl;
   };
 
 
@@ -68,19 +128,24 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
     setIsGenerating(true);
     setAiError(null);
     setAiImage(null);
+    setIsComparing(false);
+    setComparisonImage(null);
+    setComparisonFabricId('');
     try {
       const fabric = availableFabrics.find(f => f.id === targetFabricId) || availableFabrics[0] || FABRICS[0];
 
       // 1. Upload base image to Cloudinary via backend
-      const uploadRes = await arApi.uploadImage({ image: srcToUse });
-      if (!uploadRes.success || !uploadRes.url) {
-        throw new Error('Upload failed');
+      let uploadedRoomUrl = typeof overrideSrc === 'string' ? '' : roomImageUrl;
+      if (!uploadedRoomUrl) {
+        const uploadRes = await arApi.uploadImage({ image: srcToUse });
+        if (!uploadRes.success || !uploadRes.url) throw new Error('Upload failed');
+        uploadedRoomUrl = uploadRes.url;
+        setRoomImageUrl(uploadedRoomUrl);
       }
-      const roomImageUrl = uploadRes.url;
 
       // 2. Call Gemini Image Generation with Cloudinary URL
       const response = await arApi.generatePreview({
-        imageUrl: roomImageUrl,
+        imageUrl: uploadedRoomUrl,
         color: fabric.hex,
         fabricName: fabric.label,
       });
@@ -120,10 +185,49 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
 
 
   const handleFileChange = (e) => {
-    if (e.target.files[0]) {
+    const file = e.target.files?.[0];
+    if (file) {
       setAiImage(null);
       setAiError(null);
-      loadImage(e.target.files[0]);
+      loadImage(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleCompare = async () => {
+    if (isComparing) {
+      setIsComparing(false);
+      return;
+    }
+    if (!nearestFabric || !roomImgSrc || isGeneratingComparison) return;
+    if (comparisonImage && comparisonFabricId === nearestFabric.id) {
+      setIsComparing(true);
+      return;
+    }
+
+    setIsGeneratingComparison(true);
+    setAiError(null);
+    try {
+      let uploadedRoomUrl = roomImageUrl;
+      if (!uploadedRoomUrl) {
+        const uploadRes = await arApi.uploadImage({ image: roomImgSrc });
+        if (!uploadRes.success || !uploadRes.url) throw new Error('Upload failed');
+        uploadedRoomUrl = uploadRes.url;
+        setRoomImageUrl(uploadedRoomUrl);
+      }
+      const response = await arApi.generatePreview({
+        imageUrl: uploadedRoomUrl,
+        color: nearestFabric.hex,
+        fabricName: nearestFabric.label,
+      });
+      if (!response.success || !response.image) throw new Error('No image in response');
+      setComparisonImage(response.image);
+      setComparisonFabricId(nearestFabric.id);
+      setIsComparing(true);
+    } catch (error) {
+      setAiError(safeArErrorMessage(error));
+    } finally {
+      setIsGeneratingComparison(false);
     }
   };
 
@@ -179,7 +283,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                 </span>
               </button>
               <button
-                onClick={() => { setRoomImg(null); setAiImage(null); setRoomImgSrc(null); setMode(MODES.AI); }}
+                onClick={() => { setRoomImg(null); setAiImage(null); setRoomImgSrc(null); setRoomImageUrl(''); setComparisonImage(null); setComparisonFabricId(''); setIsComparing(false); setMode(MODES.AI); }}
                 className={`px-3 py-1.5 text-[11px] font-label-caps uppercase tracking-wider transition-colors text-on-surface-variant hover:bg-bone`}
               >
                 <span className="flex items-center gap-1">
@@ -210,28 +314,46 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
         {/* ── AI mode: show generated image or upload prompt ── */}
         {mode === MODES.AI ? (
           roomImg ? (
-            <div className="flex-1 flex items-center justify-center p-4 md:p-8 bg-bone/50 overflow-hidden relative min-h-[40vh] md:min-h-0">
-              {/* Always show room image as base */}
-              <img
-                src={roomImgSrc}
-                alt="Room"
-                className="block select-none pointer-events-none max-w-full max-h-full rounded shadow-xl object-contain"
-                style={{ display: (aiImage && !isComparing) ? 'none' : 'block' }}
-              />
-
-              {/* AI-generated overlay */}
-              {aiImage && !isComparing && (
+            <div className="relative flex min-h-[40vh] flex-1 overflow-hidden bg-bone/50 md:min-h-0">
+              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4 md:p-8">
+                <div className="flex h-full min-h-0 w-full items-center justify-center">
+                {/* Always show room image as base */}
                 <img
-                  src={aiImage}
-                  alt="AI Preview"
-                  className="block select-none pointer-events-none max-w-full max-h-full rounded shadow-xl object-contain"
-                  style={{ display: 'block' }}
+                  src={roomImgSrc}
+                  alt="Room"
+                  className="block max-h-full max-w-full select-none rounded object-contain shadow-xl pointer-events-none"
+                  style={{ display: aiImage ? 'none' : 'block' }}
                 />
+
+                {/* AI-generated overlay */}
+                {aiImage && !isComparing && (
+                  <img
+                    src={aiImage}
+                    alt="AI Preview"
+                    className="block max-h-full max-w-full select-none rounded object-contain shadow-xl pointer-events-none"
+                  />
+                )}
+
+                {isComparing && comparisonImage && (
+                  <img
+                    src={comparisonImage}
+                    alt={`AR Preview màu ${nearestFabric?.label || ''}`}
+                    className="block max-h-full max-w-full select-none rounded object-contain shadow-xl pointer-events-none"
+                  />
+                )}
+
+                </div>
+
+              {isComparing && nearestFabric && (
+                <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-slate-deep shadow backdrop-blur-sm">
+                  <span className="h-3 w-3 rounded-full border border-slate-deep/15" style={{ backgroundColor: nearestFabric.hex }} />
+                  Màu gần nhất: {nearestFabric.label}
+                </div>
               )}
 
               {/* Action buttons overlay at bottom center */}
               {aiImage && !isGenerating && !aiError && (
-                <div className="absolute bottom-6 md:bottom-8 left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-slate-deep/10 bg-white/90 px-1 py-1 shadow-lg backdrop-blur-md md:gap-1 md:px-1.5 md:py-1.5">
+                <div className="absolute bottom-12 left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-slate-deep/10 bg-white/90 px-1 py-1 shadow-lg backdrop-blur-md md:gap-1 md:px-1.5 md:py-1.5">
                   <button
                     onClick={downloadAiImage}
                     className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-medium text-slate-deep transition-colors hover:bg-slate-deep/5 sm:px-4 sm:text-[13px]"
@@ -251,14 +373,11 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                   </button>
                   <div className="mx-0.5 h-4 w-px bg-slate-deep/20 sm:mx-1" />
                   <button
-                    onMouseDown={() => setIsComparing(true)}
-                    onMouseUp={() => setIsComparing(false)}
-                    onMouseLeave={() => setIsComparing(false)}
-                    onTouchStart={() => setIsComparing(true)}
-                    onTouchEnd={() => setIsComparing(false)}
-                    className="flex shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-medium text-slate-deep transition-colors hover:bg-slate-deep/5 active:bg-slate-deep/10 sm:px-4 sm:text-[13px]"
+                    onClick={handleCompare}
+                    disabled={!nearestFabric || isGeneratingComparison}
+                    className="flex shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-medium text-slate-deep transition-colors hover:bg-slate-deep/5 active:bg-slate-deep/10 disabled:cursor-wait disabled:opacity-50 sm:px-4 sm:text-[13px]"
                   >
-                    So sánh
+                    {isGeneratingComparison ? 'Đang tạo…' : isComparing ? 'Màu hiện tại' : 'So sánh'}
                   </button>
                 </div>
               )}
@@ -317,10 +436,14 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                   )}
                 </div>
               )}
+              </div>
+              <p className="absolute bottom-0 left-0 right-0 z-40 bg-white/95 px-4 py-2 text-center text-[10px] font-medium italic leading-4 text-slate-deep/75 backdrop-blur-sm md:text-[12px]">
+                *Hình ảnh minh họa chính xác 90% màu sắc thực tế
+              </p>
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center p-6 md:p-8 bg-bone/50">
-              <div onClick={() => document.getElementById('roomUploadInput')?.click()} className="group cursor-pointer w-full max-w-2xl">
+              <label htmlFor="roomUploadInput" className="group block w-full max-w-2xl cursor-pointer">
                 <div className="aspect-[16/10] border-2 border-dashed border-slate-deep/20 flex flex-col items-center justify-center gap-4 hover:border-slate-deep/50 hover:bg-linen-white/60 transition-all duration-300 rounded">
                   <div className="w-14 h-14 border border-slate-deep/15 flex items-center justify-center group-hover:border-slate-deep/30 transition-colors">
                     <span className="material-symbols-outlined text-3xl text-slate-deep/40 group-hover:text-slate-deep/70 transition-colors">add_photo_alternate</span>
@@ -329,9 +452,14 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                     <p className="font-label-caps text-label-caps text-slate-deep uppercase tracking-widest">Tải ảnh phòng ngủ của bạn</p>
                     <p className="text-sm text-on-surface-variant mt-1">Bắt đầu trải nghiệm chăn ga lụa Slikmoon</p>
                   </div>
-                  <span className="text-[11px] font-label-caps uppercase tracking-wider text-on-surface-variant/60 border border-slate-deep/10 px-3 py-1">JPG · PNG · WEBP</span>
+                  <span className="text-[11px] font-label-caps uppercase tracking-wider text-on-surface-variant/60 border border-slate-deep/10 px-3 py-1">JPG · PNG · WEBP · HEIC</span>
+                  {aiError && (
+                    <p className="max-w-md px-4 text-center text-xs leading-5 text-red-600">
+                      {aiError}
+                    </p>
+                  )}
                 </div>
-              </div>
+              </label>
             </div>
           )
         ) : null}
@@ -353,11 +481,19 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
             document.getElementById('roomUploadInput')?.click();
           }}
           mode={mode}
+          guideTitle={guideTitle}
+          usageTips={usageTips}
         />
       </div>
 
       {/* Hidden global file input for uploads from anywhere (Sidebar or Dropzone) */}
-      <input id="roomUploadInput" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <input
+        id="roomUploadInput"
+        type="file"
+        accept="image/*,.heic,.heif"
+        className="sr-only"
+        onChange={handleFileChange}
+      />
 
       {shareUrl && (
         <div className="fixed inset-0 z-[260] bg-slate-deep/55 backdrop-blur-sm flex items-center justify-center p-5" onMouseDown={(event) => event.target === event.currentTarget && setShareUrl('')}>
@@ -383,4 +519,6 @@ ARRoomPreview.propTypes = {
     label: PropTypes.string,
     hex: PropTypes.string.isRequired,
   })),
+  guideTitle: PropTypes.string,
+  usageTips: PropTypes.arrayOf(PropTypes.string),
 };

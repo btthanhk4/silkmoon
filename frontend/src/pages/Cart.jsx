@@ -42,6 +42,9 @@ export default function Cart() {
             const product = applyLatestSizeCatalog(await productsApi.getById(item.productId), sizeSetting);
             const isCustomSize = item.sizeId === 'custom' || Boolean(item.customSize);
             const selectedSize = item.sizeId && !isCustomSize ? product.sizes?.find((size) => size.id === item.sizeId) : null;
+            const selectedColor = product.colors?.find((color) => color.id === item.colorId)
+              || product.colors?.find((color) => color.label === item.colorLabel)
+              || product.colors?.[0];
             const configurationError = !isCustomSize && ((product.sizes?.length && !item.sizeId) || (item.sizeId && !selectedSize))
               ? 'Size đã chọn không còn khả dụng. Vui lòng chọn lại sản phẩm.'
               : isCustomSize && !product.allowCustomSize
@@ -57,8 +60,8 @@ export default function Cart() {
               price: getProductSizePrice(product, item.sizeId) + customizationPrice,
               sizeLabel: selectedSize?.label || item.sizeLabel,
               sizeMeasurements: selectedSize ? getSizeMeasurements(selectedSize) : item.sizeMeasurements,
-              image: product.images?.[0] || '',
-              spec: product.category || 'N/A',
+              image: selectedColor?.images?.[0] || product.images?.[0] || '',
+              spec: selectedColor?.label || item.colorLabel || 'Chưa chọn màu',
               configurationError,
             };
           } catch {

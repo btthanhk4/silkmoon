@@ -68,10 +68,10 @@ export class User {
   emailVerificationAttempts?: number;
 
   @Prop({
-    type: [{ productId: { type: String }, cartItemId: { type: String }, quantity: { type: Number }, sizeId: { type: String }, sizeLabel: { type: String }, sizeMeasurements: { type: [Object], default: [] }, customSize: { type: Object }, customMeasurements: { type: [Object], default: [] }, embroidery: { type: String } }],
+    type: [{ productId: { type: String }, cartItemId: { type: String }, quantity: { type: Number }, colorId: { type: String }, colorLabel: { type: String }, sizeId: { type: String }, sizeLabel: { type: String }, sizeMeasurements: { type: [Object], default: [] }, customSize: { type: Object }, customMeasurements: { type: [Object], default: [] }, embroidery: { type: String } }],
     default: [],
   })
-  cart: { productId: string; cartItemId?: string; quantity: number; sizeId?: string; sizeLabel?: string; sizeMeasurements?: any[]; customSize?: any; customMeasurements?: any[]; embroidery?: string }[];
+  cart: { productId: string; cartItemId?: string; quantity: number; colorId?: string; colorLabel?: string; sizeId?: string; sizeLabel?: string; sizeMeasurements?: any[]; customSize?: any; customMeasurements?: any[]; embroidery?: string }[];
 
   @Prop({ select: false })
   resetPasswordTokenHash?: string;

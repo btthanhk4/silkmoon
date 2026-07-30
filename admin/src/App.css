@@ -1778,6 +1778,8 @@ select.customization-filter {
 
 .review-detail {
   padding: 28px;
+  display: grid;
+  gap: 16px;
 }
 
 .review-detail p {
@@ -1790,6 +1792,26 @@ select.customization-filter {
   margin-top: 8px;
   color: #d79b22;
   font-size: 20px;
+}
+
+.review-detail textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.review-detail-images {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.review-detail-images img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #dbe3ea;
 }
 
 .content-settings {

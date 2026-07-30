@@ -114,13 +114,18 @@ export class ARController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('upload')
-  async uploadImage(@Body() body: { image: string; usage?: 'product' | 'ar' }) {
+  async uploadImage(@Body() body: { image: string; usage?: 'product' | 'ar' | 'review' }) {
     if (!body.image) throw new HttpException('Missing image data', HttpStatus.BAD_REQUEST);
     try {
       const isProductImage = body.usage === 'product';
+      const folder = isProductImage
+        ? 'silkmoon_products'
+        : body.usage === 'review'
+          ? 'silkmoon_reviews'
+          : 'silkmoon_ar';
       const url = await this.arService.uploadImageToCloudinary(
         body.image,
-        isProductImage ? 'silkmoon_products' : 'silkmoon_ar',
+        folder,
         isProductImage,
       );
       return { success: true, url };

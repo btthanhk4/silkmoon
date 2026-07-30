@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 import { FABRICS } from './arUtils';
 
+const tipIcons = ['add_photo_alternate', 'palette', 'auto_awesome', 'share'];
+
 export default function ARSidebar({
   fabrics = FABRICS,
   activeFabricId,
@@ -10,6 +12,8 @@ export default function ARSidebar({
   hasImage,
   onNewImage,
   mode,
+  guideTitle = '',
+  usageTips = [],
 }) {
   const activeFabric = fabrics.find(f => f.id === activeFabricId) || fabrics[0] || FABRICS[0];
   const isAIMode = mode === 'ai';
@@ -81,24 +85,19 @@ export default function ARSidebar({
       )}
 
       {/* ── Tips ── */}
-      <div className="px-6 py-5 flex-1">
+      {(guideTitle || usageTips.length > 0) && <div className="px-6 py-5 flex-1">
         <div className="bg-bone/60 border-l-2 border-slate-deep/30 px-4 py-3 space-y-2">
-          <p className="font-label-caps text-label-caps text-slate-deep uppercase tracking-widest">Mẹo sử dụng</p>
+          <p className="font-label-caps text-label-caps text-slate-deep uppercase tracking-widest">{guideTitle}</p>
           <ul className="space-y-1.5">
-            {[
-              { icon: 'add_photo_alternate', text: 'Tải lên ảnh phòng ngủ có ánh sáng tốt' },
-              { icon: 'palette',         text: 'Chọn màu lụa để xem trước sản phẩm' },
-              { icon: 'auto_awesome',    text: 'AI sẽ tự động nhận diện và trải lụa lên giường' },
-              { icon: 'share',           text: 'Tải về hoặc sao chép ảnh để chia sẻ' },
-            ].map(({ icon, text }) => (
+            {usageTips.map((text, index) => (
               <li key={text} className="flex items-start gap-2">
-                <span className="material-symbols-outlined text-[14px] text-slate-deep/60 mt-0.5 flex-shrink-0">{icon}</span>
+                <span className="material-symbols-outlined text-[14px] text-slate-deep/60 mt-0.5 flex-shrink-0">{tipIcons[index] || 'info'}</span>
                 <span className="text-[11px] text-on-surface-variant leading-tight">{text}</span>
               </li>
             ))}
           </ul>
         </div>
-      </div>
+      </div>}
 
       {/* ── Action buttons ── */}
       <div className="px-6 pb-6 pt-4 border-t border-slate-deep/10 space-y-2.5 flex-shrink-0">
@@ -128,4 +127,6 @@ ARSidebar.propTypes = {
   hasImage:          PropTypes.bool.isRequired,
   onNewImage:        PropTypes.func.isRequired,
   mode:              PropTypes.string,
+  guideTitle:        PropTypes.string,
+  usageTips:         PropTypes.arrayOf(PropTypes.string),
 };

@@ -17,14 +17,19 @@ export default function ProductListGrid({ products }) {
 
     const lowestPriceSize = getLowestPriceSize(product);
     const listPrice = getProductListPrice(product);
+    const defaultColor = product.colors?.[0];
     const specLabel = lowestPriceSize?.label || product.category || 'STANDARD';
 
     try {
-      addToCart(product.id, 1, lowestPriceSize ? {
-        sizeId: lowestPriceSize.id,
-        sizeLabel: lowestPriceSize.label,
-        sizeMeasurements: getSizeMeasurements(lowestPriceSize),
-      } : {});
+      addToCart(product.id, 1, {
+        ...(lowestPriceSize ? {
+          sizeId: lowestPriceSize.id,
+          sizeLabel: lowestPriceSize.label,
+          sizeMeasurements: getSizeMeasurements(lowestPriceSize),
+        } : {}),
+        colorId: defaultColor?.id,
+        colorLabel: defaultColor?.label,
+      });
 
       setModalProduct({
         name: product.name,

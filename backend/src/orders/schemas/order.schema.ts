@@ -25,6 +25,12 @@ class OrderItem {
   @Prop()
   image: string;
 
+  @Prop({ default: '' })
+  colorId: string;
+
+  @Prop({ default: '' })
+  colorLabel: string;
+
   @Prop({ type: String, default: null })
   embroidery: string | null;
 

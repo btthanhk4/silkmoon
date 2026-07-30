@@ -1,7 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { reviewsApi } from '../services/api';
+import { arApi, reviewsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+
+const MAX_REVIEW_IMAGES = 4;
+const MAX_REVIEW_IMAGE_SIZE = 20 * 1024 * 1024;
+const REVIEW_IMAGE_EXTENSION = /\.(jpe?g|png|webp|heic|heif)$/i;
+
+const prepareReviewImage = (file) => new Promise((resolve, reject) => {
+  const isImage = file && (file.type.startsWith('image/') || REVIEW_IMAGE_EXTENSION.test(file.name));
+  if (!isImage) return reject(new Error('Chỉ hỗ trợ ảnh JPG, PNG, WebP hoặc HEIC.'));
+  if (file.size > MAX_REVIEW_IMAGE_SIZE) return reject(new Error('Mỗi ảnh cần nhỏ hơn 20 MB.'));
+
+  const objectUrl = URL.createObjectURL(file);
+  const image = new Image();
+  image.onload = () => {
+    try {
+      const maxDimension = 1600;
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Không thể xử lý ảnh.');
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    } catch {
+      reject(new Error('Không thể xử lý ảnh này. Vui lòng thử ảnh khác.'));
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    reject(new Error('Không thể đọc ảnh này. Vui lòng thử ảnh JPG khác.'));
+  };
+  image.src = objectUrl;
+});
 
 export default function ProductReviews({ productId }) {
   const { user } = useAuth();
@@ -9,22 +44,22 @@ export default function ProductReviews({ productId }) {
   const navigate = useNavigate();
   const [sort, setSort] = useState('newest');
   const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [isWriting, setIsWriting] = useState(false);
   const [newReviewText, setNewReviewText] = useState('');
   const [newRating, setNewRating] = useState(5);
+  const [reviewImages, setReviewImages] = useState([]);
+  const [isPreparingImages, setIsPreparingImages] = useState(false);
+  const [reviewImageError, setReviewImageError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     if (!productId) return;
-    setLoading(true);
     reviewsApi.getByProduct(productId)
       .then((data) => setReviews(data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(console.error);
   }, [productId]);
 
   useEffect(() => {
@@ -44,6 +79,9 @@ export default function ProductReviews({ productId }) {
     if (sort === 'lowest') return a.rating - b.rating;
     return 0;
   });
+  const averageRating = reviews.length
+    ? reviews.reduce((total, review) => total + Number(review.rating || 0), 0) / reviews.length
+    : 0;
 
   // Helper to render stars
   const renderStars = (rating) => {
@@ -52,6 +90,27 @@ export default function ProductReviews({ productId }) {
         star
       </span>
     ));
+  };
+
+  const handleReviewImages = async (event) => {
+    const availableSlots = MAX_REVIEW_IMAGES - reviewImages.length;
+    const files = Array.from(event.target.files || []).slice(0, availableSlots);
+    event.target.value = '';
+    if (!files.length) {
+      if (availableSlots <= 0) setReviewImageError(`Chỉ có thể tải tối đa ${MAX_REVIEW_IMAGES} ảnh.`);
+      return;
+    }
+
+    setIsPreparingImages(true);
+    setReviewImageError('');
+    try {
+      const preparedImages = await Promise.all(files.map(prepareReviewImage));
+      setReviewImages((current) => [...current, ...preparedImages].slice(0, MAX_REVIEW_IMAGES));
+    } catch (error) {
+      setReviewImageError(error.message || 'Không thể xử lý ảnh đã chọn.');
+    } finally {
+      setIsPreparingImages(false);
+    }
   };
 
   const handleSubmitReview = async (e) => {
@@ -63,21 +122,27 @@ export default function ProductReviews({ productId }) {
     }
     
     setIsSubmitting(true);
+    setSubmitError('');
     try {
+      const uploadedImages = await Promise.all(reviewImages.map(async (image) => {
+        const result = await arApi.uploadImage({ image, usage: 'review' });
+        if (!result?.success || !result.url) throw new Error('Không thể tải ảnh đánh giá.');
+        return result.url;
+      }));
       const newReview = await reviewsApi.create({
         productId,
         rating: newRating,
-        title: newReviewText.slice(0, 20) + (newReviewText.length > 20 ? '...' : ''),
-        content: newReviewText,
-        images: []
+        authorName: user.fullName || user.email || 'Khách hàng',
+        comment: newReviewText.trim(),
+        images: uploadedImages,
       });
       setReviews([newReview, ...reviews]);
       setNewReviewText('');
       setNewRating(5);
+      setReviewImages([]);
       setIsWriting(false);
-    } catch {
-      setSubmitError('Không thể gửi đánh giá. Phiên đăng nhập có thể đã hết hạn, anh/chị vui lòng đăng nhập lại.');
-      setShowLoginModal(true);
+    } catch (error) {
+      setSubmitError(error.message || 'Không thể gửi đánh giá. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -95,9 +160,9 @@ export default function ProductReviews({ productId }) {
         {/* Average Rating */}
         <div className="text-center shrink-0">
           <div className="flex items-center justify-center gap-1 mb-2">
-            {renderStars(5)}
+            {renderStars(Math.round(averageRating))}
             <span className="ml-2 text-lg font-bold text-slate-deep underline decoration-1 underline-offset-4 whitespace-nowrap">
-              4.94 trên 5
+              {averageRating.toFixed(1)} trên 5
             </span>
           </div>
           <p className="text-sm text-slate-deep/70 whitespace-nowrap">
@@ -170,6 +235,30 @@ export default function ProductReviews({ productId }) {
               onChange={(e) => setNewReviewText(e.target.value)}
               required
             ></textarea>
+            <div className="mb-5">
+              <div className="mb-2 flex flex-wrap items-center gap-3">
+                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-deep/20 bg-white px-4 py-2.5 text-sm font-medium text-slate-deep transition-colors hover:bg-slate-deep/5 ${isPreparingImages || reviewImages.length >= MAX_REVIEW_IMAGES ? 'pointer-events-none opacity-50' : ''}`}>
+                  <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+                  {isPreparingImages ? 'Đang xử lý ảnh…' : 'Thêm ảnh (không bắt buộc)'}
+                  <input type="file" accept="image/*,.heic,.heif" multiple hidden disabled={isPreparingImages || reviewImages.length >= MAX_REVIEW_IMAGES} onChange={handleReviewImages} />
+                </label>
+                <span className="text-xs text-slate-deep/55">Tối đa {MAX_REVIEW_IMAGES} ảnh</span>
+              </div>
+              {!!reviewImages.length && (
+                <div className="flex flex-wrap gap-3">
+                  {reviewImages.map((image, index) => (
+                    <div className="relative h-20 w-20" key={`${image.slice(-24)}-${index}`}>
+                      <img src={image} alt={`Ảnh đánh giá ${index + 1}`} className="h-full w-full rounded-lg border border-slate-deep/10 object-cover" />
+                      <button type="button" onClick={() => setReviewImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-deep text-white shadow" aria-label={`Xóa ảnh ${index + 1}`}>
+                        <span className="material-symbols-outlined text-[15px]">close</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {reviewImageError && <p className="mt-2 text-xs text-red-600">{reviewImageError}</p>}
+              {submitError && <p className="mt-2 text-xs text-red-600">{submitError}</p>}
+            </div>
             <div className="flex justify-end gap-3">
               <button 
                 type="button" 
@@ -180,7 +269,7 @@ export default function ProductReviews({ productId }) {
               </button>
               <button 
                 type="submit" 
-                disabled={isSubmitting}
+                disabled={isSubmitting || isPreparingImages}
                 className="px-6 py-2 rounded bg-sage-haze text-white font-medium hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
               >
                 {isSubmitting ? 'Đang gửi...' : 'Gửi đánh giá'}
@@ -236,7 +325,7 @@ export default function ProductReviews({ productId }) {
             <p className="text-center text-slate-500 py-8">Không có đánh giá nào phù hợp với bộ lọc này.</p>
           ) : (
             filteredReviews.map((review) => (
-            <div key={review.id} className="pb-8 border-b border-slate-deep/5">
+            <div key={review._id || review.id} className="pb-8 border-b border-slate-deep/5">
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <div className="flex gap-1 mb-2">
@@ -244,7 +333,7 @@ export default function ProductReviews({ productId }) {
                   </div>
                   <div className="flex items-center gap-2 text-sage-haze font-medium text-sm">
                     <span className="material-symbols-outlined text-[18px]">person_outline</span>
-                    {review.user?.fullName || review.name || 'Người dùng ẩn danh'}
+                    {review.authorName || review.user?.fullName || review.name || 'Người dùng ẩn danh'}
                   </div>
                 </div>
                 <div className="text-slate-400 text-sm">
@@ -252,13 +341,13 @@ export default function ProductReviews({ productId }) {
                 </div>
               </div>
               
-              <h4 className="font-bold text-slate-deep mb-2">{review.title}</h4>
-              <p className="text-slate-deep/80 text-sm mb-4 leading-relaxed">{review.content}</p>
+              {review.title && <h4 className="font-bold text-slate-deep mb-2">{review.title}</h4>}
+              <p className="text-slate-deep/80 text-sm mb-4 leading-relaxed">{review.comment || review.content}</p>
               
               {review.images && review.images.length > 0 && (
                 <div className="flex gap-3">
                   {review.images.map((img, index) => (
-                    <img key={index} src={img} alt="Review" className="w-20 h-20 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-90" />
+                    <a href={img} target="_blank" rel="noreferrer" key={img || index}><img src={img} alt={`Ảnh đánh giá ${index + 1}`} className="w-20 h-20 object-cover rounded border border-slate-200 cursor-pointer hover:opacity-90" /></a>
                   ))}
                 </div>
               )}

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { blogApi, settingsApi } from "../services/api";
+import VideoExperience from "../component/VideoExperience";
+import { blogApi } from "../services/api";
 
 export default function Blog() {
   const location = useLocation();
   const [posts, setPosts] = useState([]),
     [categories, setCategories] = useState([]),
-    [videos, setVideos] = useState([]),
     [active, setActive] = useState("all");
   useEffect(() => {
     blogApi.getPosts().then(setPosts);
@@ -17,16 +17,6 @@ export default function Blog() {
         if (careCategory) setActive(careCategory._id);
       }
     });
-    settingsApi
-      .get("website_content")
-      .then((setting) =>
-        setVideos(
-          (setting?.value?.blogVideos || []).filter(
-            (video) => video.isActive !== false,
-          ),
-        ),
-      )
-      .catch(() => setVideos([]));
   }, [location.search]);
   const visible = useMemo(() => {
     const items = Array.isArray(posts) ? posts : [];
@@ -167,44 +157,8 @@ export default function Blog() {
             </div>
           </section>
         )}
-        {videos.length > 0 && (
-          <section className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-[#A7E4CD] rounded-2xl p-8 flex flex-col items-center justify-center min-h-[300px]">
-              <h2 className="text-3xl font-bold text-slate-deep mb-4">
-                Videos
-              </h2>
-              <span className="px-5 py-1.5 rounded-full border border-slate-deep text-sm">
-                Xem toàn bộ
-              </span>
-            </div>
-            {videos.slice(0, 3).map((video) => (
-              <a
-                href={video.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                key={video.id}
-                className="relative rounded-2xl overflow-hidden min-h-[300px] group"
-              >
-                <img
-                  src={video.thumbnail}
-                  alt={video.title || "Video"}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white text-6xl">
-                    play_circle
-                  </span>
-                  {video.title && (
-                    <span className="absolute bottom-5 left-5 right-5 text-white font-bold drop-shadow">
-                      {video.title}
-                    </span>
-                  )}
-                </div>
-              </a>
-            ))}
-          </section>
-        )}
       </div>
+      <VideoExperience />
     </main>
   );
 }

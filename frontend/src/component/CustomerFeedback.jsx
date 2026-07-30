@@ -1,5 +1,7 @@
-export default function CustomerFeedback() {
-  const feedbacks = [
+import { useEffect, useState } from 'react';
+import { reviewsApi } from '../services/api';
+
+const fallbackFeedbacks = [
     {
       text: "Bộ chăn ga Tencel của SILKMOON thực sự làm thay đổi giấc ngủ của mình. Vải cực kỳ mềm mại, mát rượi vào mùa hè và giữ ấm tốt vào mùa đông. Chắc chắn sẽ ủng hộ thêm!",
       author: "Mai Anh",
@@ -21,7 +23,26 @@ export default function CustomerFeedback() {
       initial: "L",
       color: "bg-[#8C9EA1]"
     }
-  ];
+];
+
+const feedbackColors = ['bg-sage-haze', 'bg-slate-deep', 'bg-[#8C9EA1]'];
+
+export default function CustomerFeedback() {
+  const [feedbacks, setFeedbacks] = useState(fallbackFeedbacks);
+
+  useEffect(() => {
+    reviewsApi.getFeatured(6).then((items) => {
+      if (!Array.isArray(items) || !items.length) return;
+      setFeedbacks(items.map((review, index) => ({
+        text: review.comment,
+        author: review.authorName,
+        location: 'Khách hàng Silkmoon',
+        initial: review.authorName?.trim()?.charAt(0)?.toUpperCase() || 'S',
+        color: feedbackColors[index % feedbackColors.length],
+        rating: review.rating,
+      })));
+    }).catch(() => null);
+  }, []);
 
   // Nhân bản mảng để tạo hiệu ứng cuộn vô tận mượt mà
   const allFeedbacks = [...feedbacks, ...feedbacks, ...feedbacks, ...feedbacks];
@@ -49,7 +70,7 @@ export default function CustomerFeedback() {
             >
               <div className="flex text-[#F59E0B] mb-6">
                 {[1, 2, 3, 4, 5].map(star => (
-                  <span key={star} className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  <span key={star} className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: star <= (item.rating || 5) ? "'FILL' 1" : "'FILL' 0" }}>star</span>
                 ))}
               </div>
               <p className="font-body-md text-slate-deep/80 mb-8 italic flex-1">

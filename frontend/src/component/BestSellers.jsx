@@ -45,11 +45,15 @@ export default function BestSellers() {
     const specLabel = [activeColorObj?.label?.toUpperCase(), lowestPriceSize?.label].filter(Boolean).join(' / ') || 'STANDARD';
 
     try {
-      addToCart(product._id, 1, lowestPriceSize ? {
-        sizeId: lowestPriceSize.id,
-        sizeLabel: lowestPriceSize.label,
-        sizeMeasurements: getSizeMeasurements(lowestPriceSize),
-      } : {});
+      addToCart(product._id, 1, {
+        ...(lowestPriceSize ? {
+          sizeId: lowestPriceSize.id,
+          sizeLabel: lowestPriceSize.label,
+          sizeMeasurements: getSizeMeasurements(lowestPriceSize),
+        } : {}),
+        colorId: activeColorObj?.id,
+        colorLabel: activeColorObj?.label,
+      });
       
       setModalProduct({ name: product.name, price: listPrice, image: product.images?.[0], spec: specLabel });
       setModalOpen(true);

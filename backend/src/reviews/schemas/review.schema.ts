@@ -17,6 +17,9 @@ export class Review {
   @Prop({ required: true })
   comment: string;
 
+  @Prop({ type: [String], default: [] })
+  images: string[];
+
   @Prop({ default: false })
   isVerified: boolean;
 }

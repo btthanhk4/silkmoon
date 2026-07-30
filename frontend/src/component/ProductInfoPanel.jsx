@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { getLowestPriceSize, getProductOriginalPrice, getProductSizePrice } from '../utils/productPrice';
 import { getSizeMeasurements } from '../utils/productSizes';
+import { reviewsApi } from '../services/api';
 
 const fallbackColors = [
   { id: 'champagne', hex: '#E5D5C5', label: 'Champagne Silk' },
@@ -23,6 +24,18 @@ export default function ProductInfoPanel({ product, onOpenAR, onColorChange, arE
   const [quantity, setQuantity] = useState(1);
   const [embroideryText, setEmbroideryText] = useState('');
   const [customSize, setCustomSize] = useState({ length: '', width: '', height: '' });
+  const [reviewSummary, setReviewSummary] = useState({
+    average: Number(product.ratings?.average) || 0,
+    count: Number(product.ratings?.count) || 0,
+  });
+
+  useEffect(() => {
+    const productId = product._id || product.id;
+    if (!productId) return;
+    reviewsApi.getProductSummary(productId)
+      .then((summary) => setReviewSummary({ average: Number(summary?.average) || 0, count: Number(summary?.count) || 0 }))
+      .catch(() => null);
+  }, [product._id, product.id]);
 
   const allowCustomSize = Boolean(product.allowCustomSize);
   const allowEmbroidery = Boolean(product.allowEmbroidery);
@@ -96,11 +109,11 @@ export default function ProductInfoPanel({ product, onOpenAR, onColorChange, arE
         {productSummary && <p className="mt-2 line-clamp-2 text-sm leading-6 text-on-surface-variant md:text-[15px]">{productSummary}</p>}
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-deep">
-          <div className="flex text-[#F3BE3E]" aria-label="4.9 trên 5 sao">
-            {[1, 2, 3, 4, 5].map((star) => <span key={star} className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>)}
+          <div className="flex text-[#F3BE3E]" aria-label={`${reviewSummary.average.toFixed(1)} trên 5 sao`}>
+            {[1, 2, 3, 4, 5].map((star) => <span key={star} className={`material-symbols-outlined text-[18px] ${star <= Math.round(reviewSummary.average) ? '' : 'text-slate-200'}`} style={{ fontVariationSettings: star <= Math.round(reviewSummary.average) ? "'FILL' 1" : "'FILL' 0" }}>star</span>)}
           </div>
-          <strong className="text-xs">4.9</strong>
-          <span className="text-xs text-on-surface-variant underline underline-offset-2">(124 đánh giá)</span>
+          <strong className="text-xs">{reviewSummary.average.toFixed(1)}</strong>
+          <a href="#reviews" className="text-xs text-on-surface-variant underline underline-offset-2">({reviewSummary.count} đánh giá)</a>
         </div>
       </header>
 

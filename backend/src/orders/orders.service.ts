@@ -72,6 +72,10 @@ export class OrdersService {
       if (!isCustomSize && (product.sizes?.length || item.sizeId) && !selectedSize) {
         throw new BadRequestException(`Vui lòng chọn size hợp lệ cho "${product.name}".`);
       }
+      const selectedColor = (product.colors || []).find((color) => color.id === item.colorId)
+        || (product.colors || []).find((color) => color.label === item.colorLabel)
+        || product.colors?.[0]
+        || null;
       const customSize = isCustomSize ? {
         width: Math.max(0, Number(item.customSize?.width) || 0),
         length: Math.max(0, Number(item.customSize?.length) || 0),
@@ -102,11 +106,13 @@ export class OrdersService {
       items.push({
         productId: product._id.toString(),
         name: product.name,
-        spec: [product.category || 'N/A', isCustomSize ? 'May size riêng' : selectedSize?.label, sizeDetails || customSizeDetails].filter(Boolean).join(' · '),
+        spec: [selectedColor?.label || item.colorLabel || 'Chưa chọn màu', isCustomSize ? 'May size riêng' : selectedSize?.label, sizeDetails || customSizeDetails].filter(Boolean).join(' · '),
         quantity: item.quantity,
         price: unitPrice,
         costPriceSnapshot: parseNonNegativeMoney(selectedSize?.costPrice) ?? parseNonNegativeMoney(product.costPrice) ?? 0,
-        image: product.images?.[0] || '',
+        image: selectedColor?.images?.[0] || product.images?.[0] || '',
+        colorId: selectedColor?.id || item.colorId || '',
+        colorLabel: selectedColor?.label || item.colorLabel || '',
         embroidery,
         sizeId: isCustomSize ? 'custom' : selectedSize?.id || '',
         sizeLabel: isCustomSize ? 'May size riêng' : selectedSize?.label || '',

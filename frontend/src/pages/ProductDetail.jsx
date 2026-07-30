@@ -20,12 +20,22 @@ export default function ProductDetail() {
   const [jumpToImage, setJumpToImage] = useState(null);
   const [arEnabled, setArEnabled] = useState(true);
   const [arButtonVisible, setArButtonVisible] = useState(true);
+  const [arGuide, setArGuide] = useState({ title: '', tips: [] });
 
   useEffect(() => {
     settingsApi.get('assistant_config').then((row) => {
       const arConfig = row?.value?.ar || {};
       setArEnabled(arConfig.enabled !== false);
       setArButtonVisible(arConfig.showProductButton !== false);
+      const configuredTips = typeof arConfig.usageGuideText === 'string'
+        ? arConfig.usageGuideText.split(/\r?\n/).map((tip) => tip.trim()).filter(Boolean)
+        : Array.isArray(arConfig.usageTips)
+          ? arConfig.usageTips.map((tip) => String(tip).trim()).filter(Boolean)
+          : [];
+      setArGuide({
+        title: arConfig.guideTitle || '',
+        tips: configuredTips,
+      });
     }).catch(() => null);
   }, []);
 
@@ -157,6 +167,8 @@ export default function ProductDetail() {
         onClose={() => setIsAROpen(false)}
         productColor={activeColor || activeColorId}
         productColors={product.colors}
+        guideTitle={arGuide.title}
+        usageTips={arGuide.tips}
       />}
     </div>
   );

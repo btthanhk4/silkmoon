@@ -116,6 +116,8 @@ export const ordersApi = {
 // ── Reviews ───────────────────────────────────────────────
 export const reviewsApi = {
   getByProduct: (productId) => request(`/reviews/product/${productId}`),
+  getProductSummary: (productId) => request(`/reviews/product/${productId}/summary`),
+  getFeatured: (limit = 6) => request(`/reviews/featured?limit=${limit}`),
 
   create: (reviewData) =>
     request('/reviews', {

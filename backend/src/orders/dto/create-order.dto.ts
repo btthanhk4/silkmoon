@@ -23,6 +23,14 @@ class OrderItemDto {
 
   @IsOptional()
   @IsString()
+  colorId?: string;
+
+  @IsOptional()
+  @IsString()
+  colorLabel?: string;
+
+  @IsOptional()
+  @IsString()
   sizeId?: string;
 
   @IsOptional()

@@ -82,12 +82,18 @@ export function ReviewsManager() {
               </button>
             </div>
             <div className="review-detail">
-              <strong>{selected.authorName}</strong>
-              <div className="review-stars">
-                {"★".repeat(selected.rating)}
-                {"☆".repeat(5 - selected.rating)}
-              </div>
-              <p>{selected.comment}</p>
+              <label className="modal-field"><span>Tên khách hàng</span><input value={selected.authorName} onChange={(event) => setSelected({ ...selected, authorName: event.target.value })} /></label>
+              <label className="modal-field"><span>Số sao</span><select value={selected.rating} onChange={(event) => setSelected({ ...selected, rating: Number(event.target.value) })}>{[5,4,3,2,1].map((rating) => <option value={rating} key={rating}>{rating} sao</option>)}</select></label>
+              <label className="modal-field"><span>Nội dung đánh giá</span><textarea rows="5" value={selected.comment} onChange={(event) => setSelected({ ...selected, comment: event.target.value })} /></label>
+              {!!selected.images?.length && (
+                <div className="review-detail-images">
+                  {selected.images.map((image, index) => (
+                    <a href={image} target="_blank" rel="noreferrer" key={image}>
+                      <img src={image} alt={`Ảnh đánh giá ${index + 1}`} />
+                    </a>
+                  ))}
+                </div>
+              )}
               <small>Mã sản phẩm: {selected.productId}</small>
             </div>
             <div className="modal-actions">
@@ -103,7 +109,7 @@ export function ReviewsManager() {
                 Xóa
               </button>
               <button
-                className="primary-button"
+                className="secondary-button"
                 onClick={() =>
                   adminApi
                     .updateReview(selected._id, {
@@ -116,6 +122,13 @@ export function ReviewsManager() {
                 }
               >
                 {selected.isVerified ? "Bỏ duyệt" : "Duyệt"}
+              </button>
+              <button
+                className="primary-button"
+                disabled={!selected.authorName.trim() || !selected.comment.trim()}
+                onClick={() => adminApi.updateReview(selected._id, { authorName: selected.authorName.trim(), rating: Number(selected.rating), comment: selected.comment.trim() }).then(() => { setSelected(null); load(); })}
+              >
+                Lưu chỉnh sửa
               </button>
             </div>
           </div>
@@ -1161,7 +1174,7 @@ export function FinanceManager() {
 
 const assistantDefaults = {
   chatbot: { enabled: true, greeting: "Xin chào! Bạn cần tư vấn sản phẩm?", fallbackResponse: "Cảm ơn bạn đã nhắn tin. Bạn có thể hỏi tôi về chất liệu, giá bán hoặc sản phẩm Silkmoon.", systemPrompt: "Tư vấn ngắn gọn, chính xác và chỉ sử dụng thông tin sản phẩm Silkmoon." },
-  ar: { enabled: true, showProductButton: true, aiModeEnabled: true, webxrEnabled: true, defaultPrompt: "Phủ chất liệu sản phẩm lên giường, giữ nguyên bố cục và ánh sáng căn phòng.", retentionDays: 7, monthlyBudget: 0 },
+  ar: { enabled: true, showProductButton: true, aiModeEnabled: true, webxrEnabled: true, defaultPrompt: "", guideTitle: "", usageGuideText: "", retentionDays: 7, monthlyBudget: 0 },
 };
 
 function AssistantSettingsManager({ section, title, description }) {
@@ -1171,7 +1184,12 @@ function AssistantSettingsManager({ section, title, description }) {
   useEffect(() => {
     adminApi.getSettings().then((rows) => {
       const row = rows.find((item) => item.key === "assistant_config");
-      if (row?.value) setConfig({ chatbot: { ...assistantDefaults.chatbot, ...row.value.chatbot }, ar: { ...assistantDefaults.ar, ...row.value.ar } });
+      if (row?.value) {
+        const loadedAr = { ...assistantDefaults.ar, ...row.value.ar };
+        if (!loadedAr.usageGuideText && Array.isArray(loadedAr.usageTips)) loadedAr.usageGuideText = loadedAr.usageTips.join("\n");
+        delete loadedAr.usageTips;
+        setConfig({ chatbot: { ...assistantDefaults.chatbot, ...row.value.chatbot }, ar: loadedAr });
+      }
     });
     adminApi.getAiUsage().then(setUsage);
   }, []);
@@ -1202,6 +1220,8 @@ function AssistantSettingsManager({ section, title, description }) {
           <label className="option-toggle modal-field"><input type="checkbox" checked={values.webxrEnabled} onChange={(event) => update("webxrEnabled", event.target.checked)} /><span className="toggle-ui" /><span><strong>WebXR</strong><small>Cho phép trải nghiệm AR thời gian thực.</small></span></label>
           <Field label="Số ngày lưu ảnh"><input type="number" min="1" value={values.retentionDays} onChange={(event) => update("retentionDays", Number(event.target.value))} /></Field>
           <Field label="Ngân sách tháng (VNĐ)"><input type="number" min="0" value={values.monthlyBudget} onChange={(event) => update("monthlyBudget", Number(event.target.value))} /></Field>
+          <Field label="Tiêu đề hướng dẫn"><input value={values.guideTitle || ""} onChange={(event) => update("guideTitle", event.target.value)} /></Field>
+          <label className="modal-field full"><span>Nội dung hướng dẫn AR <small>Mỗi dòng sẽ hiển thị thành một ý hướng dẫn.</small></span><textarea rows="7" value={values.usageGuideText || ""} onChange={(event) => update("usageGuideText", event.target.value)} /></label>
           <label className="modal-field full"><span>Prompt tạo ảnh mặc định</span><textarea rows="5" value={values.defaultPrompt} onChange={(event) => update("defaultPrompt", event.target.value)} /></label>
         </>}
       </div>

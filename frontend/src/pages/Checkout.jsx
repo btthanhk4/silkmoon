@@ -43,6 +43,8 @@ export default function Checkout() {
         items: cart.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
+          colorId: item.colorId || undefined,
+          colorLabel: item.colorLabel || undefined,
           sizeId: item.sizeId || undefined,
           sizeLabel: item.sizeLabel || undefined,
           sizeMeasurements: item.sizeMeasurements || undefined,

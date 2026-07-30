@@ -4,6 +4,7 @@ import BestSellers from '../component/BestSellers';
 import Services from '../component/Services';
 import BrandStory from '../component/BrandStory';
 import BlogPosts from '../component/BlogPosts';
+import VideoExperience from '../component/VideoExperience';
 import CustomerFeedback from '../component/CustomerFeedback';
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
       <Services />
       <BrandStory />
       <BlogPosts />
+      <VideoExperience />
       <CustomerFeedback />
     </>
   );
