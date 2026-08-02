@@ -6,24 +6,12 @@ import ARSidebar from './ARSidebar';
 import arLoadingUrl from '../../assets/ar-loading.svg';
 
 // ── Mode: 'ai' = AI-generated image (AR Try on), 'ar' = Realtime WebXR
+
 const MODES = { AI: 'ai', AR: 'ar' };
 const MAX_UPLOAD_SIZE = 30 * 1024 * 1024;
 const MAX_IMAGE_DIMENSION = 2048;
 const IMAGE_FILE_EXTENSION = /\.(jpe?g|png|webp|heic|heif)$/i;
 const AR_RETRY_DELAY_SECONDS = 20;
-
-const colorDistance = (firstHex, secondHex) => {
-  const parse = (hex) => {
-    const value = String(hex || '').replace('#', '');
-    const normalized = value.length === 3 ? value.split('').map((part) => part + part).join('') : value;
-    if (!/^[0-9a-f]{6}$/i.test(normalized)) return null;
-    return [0, 2, 4].map((index) => parseInt(normalized.slice(index, index + 2), 16));
-  };
-  const first = parse(firstHex);
-  const second = parse(secondHex);
-  if (!first || !second) return Number.POSITIVE_INFINITY;
-  return Math.sqrt(first.reduce((total, channel, index) => total + ((channel - second[index]) ** 2), 0));
-};
 
 const safeArErrorMessage = (error) => {
   const message = String(error?.message || '').toLowerCase();
@@ -54,22 +42,12 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
   const [opacity, setOpacity]               = useState(1.0); // Changed to 1.0 to fully hide the bed
   const [mode, setMode]                     = useState(MODES.AI);
   const [isComparing, setIsComparing]       = useState(false);
-  const [comparisonImage, setComparisonImage] = useState(null);
-  const [comparisonFabricId, setComparisonFabricId] = useState('');
-  const [isGeneratingComparison, setIsGeneratingComparison] = useState(false);
   const [aiImage, setAiImage]               = useState(null);
   const [isGenerating, setIsGenerating]     = useState(false);
   const [aiError, setAiError]               = useState(null);
   const [retryCountdown, setRetryCountdown] = useState(null);
   const [shareUrl, setShareUrl]             = useState('');
   const [shareCopied, setShareCopied]       = useState(false);
-  const nearestFabric = useMemo(() => {
-    const active = availableFabrics.find((fabric) => fabric.id === activeFabricId);
-    if (!active) return null;
-    return availableFabrics
-      .filter((fabric) => fabric.id !== active.id)
-      .sort((first, second) => colorDistance(active.hex, first.hex) - colorDistance(active.hex, second.hex))[0] || null;
-  }, [activeFabricId, availableFabrics]);
 
   // ── Load image file ──────────────────────────────────────
   const loadImage = (file) => {
@@ -104,8 +82,6 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
         setRoomImg(img);
         setRoomImgSrc(normalizedSrc);
         setRoomImageUrl('');
-        setComparisonImage(null);
-        setComparisonFabricId('');
         setIsComparing(false);
         runGenerate(normalizedSrc);
       } catch {
@@ -130,8 +106,6 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
     setAiError(null);
     setAiImage(null);
     setIsComparing(false);
-    setComparisonImage(null);
-    setComparisonFabricId('');
     try {
       const fabric = availableFabrics.find(f => f.id === targetFabricId) || availableFabrics[0] || FABRICS[0];
 
@@ -195,41 +169,8 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
     e.target.value = '';
   };
 
-  const handleCompare = async () => {
-    if (isComparing) {
-      setIsComparing(false);
-      return;
-    }
-    if (!nearestFabric || !roomImgSrc || isGeneratingComparison) return;
-    if (comparisonImage && comparisonFabricId === nearestFabric.id) {
-      setIsComparing(true);
-      return;
-    }
-
-    setIsGeneratingComparison(true);
-    setAiError(null);
-    try {
-      let uploadedRoomUrl = roomImageUrl;
-      if (!uploadedRoomUrl) {
-        const uploadRes = await arApi.uploadImage({ image: roomImgSrc });
-        if (!uploadRes.success || !uploadRes.url) throw new Error('Upload failed');
-        uploadedRoomUrl = uploadRes.url;
-        setRoomImageUrl(uploadedRoomUrl);
-      }
-      const response = await arApi.generatePreview({
-        imageUrl: uploadedRoomUrl,
-        color: nearestFabric.hex,
-        fabricName: nearestFabric.label,
-      });
-      if (!response.success || !response.image) throw new Error('No image in response');
-      setComparisonImage(response.image);
-      setComparisonFabricId(nearestFabric.id);
-      setIsComparing(true);
-    } catch (error) {
-      setAiError(safeArErrorMessage(error));
-    } finally {
-      setIsGeneratingComparison(false);
-    }
+  const handleCompare = () => {
+    setIsComparing(!isComparing);
   };
 
   const downloadAiImage = () => {
@@ -284,7 +225,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                 </span>
               </button>
               <button
-                onClick={() => { setRoomImg(null); setAiImage(null); setRoomImgSrc(null); setRoomImageUrl(''); setComparisonImage(null); setComparisonFabricId(''); setIsComparing(false); setMode(MODES.AI); }}
+                onClick={() => { setRoomImg(null); setAiImage(null); setRoomImgSrc(null); setRoomImageUrl(''); setIsComparing(false); setMode(MODES.AI); }}
                 className={`px-3 py-1.5 text-[11px] font-label-caps uppercase tracking-wider transition-colors text-on-surface-variant hover:bg-bone`}
               >
                 <span className="flex items-center gap-1">
@@ -323,7 +264,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                   src={roomImgSrc}
                   alt="Room"
                   className="block max-h-full max-w-full select-none rounded object-contain shadow-xl pointer-events-none"
-                  style={{ display: aiImage ? 'none' : 'block' }}
+                  style={{ display: (aiImage && !isComparing) ? 'none' : 'block' }}
                 />
 
                 {/* AI-generated overlay */}
@@ -334,21 +275,11 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                     className="block max-h-full max-w-full select-none rounded object-contain shadow-xl pointer-events-none"
                   />
                 )}
-
-                {isComparing && comparisonImage && (
-                  <img
-                    src={comparisonImage}
-                    alt={`AR Preview màu ${nearestFabric?.label || ''}`}
-                    className="block max-h-full max-w-full select-none rounded object-contain shadow-xl pointer-events-none"
-                  />
-                )}
-
                 </div>
 
-              {isComparing && nearestFabric && (
+              {isComparing && (
                 <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-slate-deep shadow backdrop-blur-sm">
-                  <span className="h-3 w-3 rounded-full border border-slate-deep/15" style={{ backgroundColor: nearestFabric.hex }} />
-                  Màu gần nhất: {nearestFabric.label}
+                  Ảnh gốc
                 </div>
               )}
 
@@ -375,10 +306,9 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
                   <div className="mx-0.5 h-4 w-px bg-slate-deep/20 sm:mx-1" />
                   <button
                     onClick={handleCompare}
-                    disabled={!nearestFabric || isGeneratingComparison}
-                    className="flex shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-medium text-slate-deep transition-colors hover:bg-slate-deep/5 active:bg-slate-deep/10 disabled:cursor-wait disabled:opacity-50 sm:px-4 sm:text-[13px]"
+                    className="flex shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-medium text-slate-deep transition-colors hover:bg-slate-deep/5 active:bg-slate-deep/10 sm:px-4 sm:text-[13px]"
                   >
-                    {isGeneratingComparison ? 'Đang tạo…' : isComparing ? 'Màu hiện tại' : 'So sánh'}
+                    {isComparing ? 'Ảnh AR' : 'So sánh'}
                   </button>
                 </div>
               )}
