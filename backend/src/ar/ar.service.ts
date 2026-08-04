@@ -324,16 +324,25 @@ Task: Edit this bedroom photo to show what the bed would look like with a new be
 
 Instructions:
 - Replace the ENTIRE bedding set (including all bed sheets, blankets, duvet covers, and pillows) with a luxurious silk fabric in the color: ${fabricName} (hex: ${colorHex})
-- The silk fabric should have a subtle sheen and slight texture typical of high-quality silk bedding
 - Keep the EXACT SAME perspective, lighting, shadows, and room composition
 - Keep the headboard, footboard, bed frame, nightstands, walls, floors, and room decor completely unchanged
 - The new fabric should follow the same folds, wrinkles, and draping as the original
 - Maintain photorealistic quality — this should look like a real product photo
 
 Output: The edited bedroom photo with the entire bedding set color changed to ${fabricName}.`;
-    const prompt = customPrompt
+    const basePrompt = customPrompt
       ? `${customPrompt}\nMàu sản phẩm: ${fabricName} (${colorHex}). Giữ nguyên phối cảnh, ánh sáng, nội thất và chỉ thay đổi bộ chăn ga trên giường.`
       : defaultPrompt;
+    const mandatorySilkFinish = `
+
+MANDATORY MATERIAL AND FINISH OVERRIDE (highest priority):
+- Render ALL visible bedding surfaces as premium glossy silk, regardless of whether the source bedding looks like cotton, linen, matte fabric, or any other material.
+- Do NOT preserve or reproduce the source fabric's matte, dry, fuzzy, coarse, woven, or cotton-like surface appearance.
+- Add clearly visible but realistic silk luster: smooth reflective fibers, soft specular highlights, and flowing highlight gradients along folds and curves.
+- The silk sheen must be consistently visible across sheets, duvet/blanket, and pillowcases while preserving the requested color.
+- Keep the shine elegant and photorealistic, not metallic, plastic, wet, blown-out, or mirror-like.
+- Adapt reflections to the room's existing light direction so the result remains physically believable.`;
+    const prompt = `${basePrompt}${mandatorySilkFinish}`;
 
     const freeModels = [
       'gemini-3.1-flash-lite-image',

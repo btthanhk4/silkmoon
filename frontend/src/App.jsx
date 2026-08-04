@@ -26,6 +26,7 @@ const typographyDeviceSizes = {
   mobile: { pageTitle: 34, intro: 15, eyebrow: 10, sectionTitle: 25, body: 15, cardTitle: 18, cardBody: 13, meta: 11, button: 12, price: 21, optionLabel: 11, optionValue: 14, formLabel: 11, input: 15, stepLabel: 10 },
 };
 const typographyRoles = Object.keys(typographyDeviceSizes.desktop);
+const emptyFontSource = { url: '', family: '' };
 const typographyDefaults = Object.fromEntries(['desktop', 'tablet', 'mobile'].map((device) => {
   const sizes = typographyDeviceSizes[device];
   return [device, {
@@ -53,6 +54,37 @@ const typographyVariables = (typography = {}) => Object.fromEntries(
   }),
 );
 
+const isDirectFontUrl = (value) => {
+  try {
+    return /\.(woff2?|ttf|otf)$/i.test(new URL(value).pathname);
+  } catch {
+    return false;
+  }
+};
+
+function ExternalFontLoader({ source }) {
+  useEffect(() => {
+    const url = source?.url?.trim();
+    const family = source?.family?.trim();
+    if (!url || !family || !/^https?:\/\//i.test(url)) return undefined;
+
+    const element = document.createElement(isDirectFontUrl(url) ? 'style' : 'link');
+    element.dataset.silkmoonCustomFont = 'website';
+    if (element.tagName === 'STYLE') {
+      const safeFamily = family.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const safeUrl = new URL(url).toString().replace(/"/g, '%22');
+      element.textContent = `@font-face { font-family: "${safeFamily}"; src: url("${safeUrl}"); font-display: swap; }`;
+    } else {
+      element.rel = 'stylesheet';
+      element.href = url;
+    }
+    document.head.appendChild(element);
+    return () => element.remove();
+  }, [source?.url, source?.family]);
+
+  return null;
+}
+
 // Scroll to top on route change for seamless page switching
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -69,8 +101,9 @@ function AppContent() {
   const { pathname } = useLocation();
   const [typography, setTypography] = useState(typographyDefaults);
   const [pageTypography, setPageTypography] = useState({});
+  const [fontSource, setFontSource] = useState(emptyFontSource);
   useEffect(() => {
-    const loadTypography = () => settingsApi.get('website_content').then((setting) => { setTypography(setting?.value?.typography || typographyDefaults); setPageTypography(setting?.value?.pageTypography || {}); }).catch(() => {});
+    const loadTypography = () => settingsApi.get('website_content').then((setting) => { setTypography(setting?.value?.typography || typographyDefaults); setPageTypography(setting?.value?.pageTypography || {}); setFontSource({ ...emptyFontSource, ...(setting?.value?.fontSource || {}) }); }).catch(() => {});
     loadTypography();
     window.addEventListener('focus', loadTypography);
     const timer = window.setInterval(loadTypography, 5000);
@@ -80,6 +113,7 @@ function AppContent() {
   const effectiveTypography = Object.fromEntries(['desktop', 'tablet', 'mobile'].map((device) => [device, { ...typographyDefaults[device], ...(typography[device] || {}), ...(pageTypography[pageKey]?.[device] || {}) }]));
   return (
     <div className={`website-typography page-typography-${pageKey} min-h-screen bg-linen-white text-slate-deep relative flex flex-col antialiased`} style={typographyVariables(effectiveTypography)}>
+      <ExternalFontLoader source={fontSource} />
       <ScrollToTop />
       
       {/* Global Header */}

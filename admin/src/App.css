@@ -2457,6 +2457,13 @@ select.customization-filter {
 .typography-real-preview.mobile.page-about .type-preview-about-hero { margin: -28px -20px 0; padding: 52px 18px; }
 
 .typography-element-list { grid-column: 1 / -1; display: grid; gap: 10px; }
+.font-source-editor { margin: 0 24px 20px; padding: 16px; display: grid; grid-template-columns: minmax(210px, .8fr) minmax(280px, 1.4fr) minmax(210px, 1fr); align-items: end; gap: 14px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcfe; }
+.font-source-editor > div { align-self: center; display: grid; gap: 5px; }
+.font-source-editor > div strong { color: var(--navy); font-size: 13px; }
+.font-source-editor > div small { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.font-source-editor label { display: grid; gap: 5px; }
+.font-source-editor label span { color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.font-source-editor input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--navy); }
 .typography-element-editor { padding: 13px 15px; display: grid; grid-template-columns: minmax(170px, 1fr) minmax(190px, 1fr) 130px; align-items: end; gap: 14px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcfe; }
 .typography-element-editor > div { align-self: center; display: grid; gap: 3px; }
 .typography-element-editor > div strong { color: var(--navy); font-size: 12px; }
@@ -2466,6 +2473,8 @@ select.customization-filter {
 .typography-element-editor select, .typography-element-editor input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--navy); }
 
 @media (max-width: 900px) {
+  .font-source-editor { grid-template-columns: 1fr 1fr; }
+  .font-source-editor > div { grid-column: 1 / -1; }
   .typography-element-editor { grid-template-columns: 1fr 1fr; }
   .typography-element-editor > div { grid-column: 1 / -1; }
   .type-preview-product, .type-preview-feature, .type-preview-story, .type-preview-checkout { grid-template-columns: 1fr; }
@@ -2474,6 +2483,8 @@ select.customization-filter {
 }
 
 @media (max-width: 620px) {
+  .font-source-editor { grid-template-columns: 1fr; }
+  .font-source-editor > div { grid-column: auto; }
   .typography-real-preview { padding: 26px 18px; }
   .typography-real-preview.page-about .type-preview-about-hero { margin: -26px -18px 0; padding: 52px 18px; }
   .type-preview-grid { grid-template-columns: 1fr; }

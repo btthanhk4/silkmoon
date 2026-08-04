@@ -50,7 +50,22 @@ export class BlogService implements OnModuleInit {
   }
 
   async createPost(data: CreateBlogPostDto) {
-    return this.posts.create(data);
+    const baseSlug = data.slug.trim();
+    let suffix = 1;
+
+    // The slug is generated from the title in the admin form. Reusing a title
+    // must not surface MongoDB's duplicate-key error as a generic HTTP 500.
+    while (suffix <= 1000) {
+      const slug = suffix === 1 ? baseSlug : `${baseSlug}-${suffix}`;
+      try {
+        return await this.posts.create({ ...data, slug });
+      } catch (error) {
+        if ((error as { code?: number })?.code !== 11000) throw error;
+        suffix += 1;
+      }
+    }
+
+    throw new Error('Không thể tạo đường dẫn duy nhất cho bài viết.');
   }
 
   async updatePost(id: string, data: UpdateBlogPostDto) {

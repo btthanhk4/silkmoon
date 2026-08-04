@@ -79,6 +79,7 @@ export function BlogPostsManager() {
     [form, setForm] = useState(null),
     [preview, setPreview] = useState(false),
     [uploading, setUploading] = useState(false),
+    [saving, setSaving] = useState(false),
     [page, setPage] = useState(1);
   const { query, setQuery, filteredItems: searchedPosts } = useListSearch(posts);
   const { filter, setFilter, filteredItems: filteredPosts } = useListFilter(searchedPosts, (item) => item.status);
@@ -121,6 +122,8 @@ export function BlogPostsManager() {
 
   const save = async (e) => {
     e.preventDefault();
+    if (saving || uploading) return;
+    setSaving(true);
     try {
       const content = await normalizeBlogContent(form.content);
       const data = { ...form, content, slug: form.slug || slugify(form.title) };
@@ -130,6 +133,8 @@ export function BlogPostsManager() {
       load(page);
     } catch (error) {
       alert(error.message || "Không thể lưu bài viết.");
+    } finally {
+      setSaving(false);
     }
   };
   const uploadCover = (file) => {
@@ -221,7 +226,7 @@ export function BlogPostsManager() {
         </table>
       </div>
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-      {form && <BlogPostEditor form={form} categories={categories} uploading={uploading} onChange={setForm} onClose={() => setForm(null)} onPreview={() => setPreview(true)} onSave={save} onUploadCover={uploadCover} />}
+      {form && <BlogPostEditor form={form} categories={categories} uploading={uploading} saving={saving} onChange={setForm} onClose={() => setForm(null)} onPreview={() => setPreview(true)} onSave={save} onUploadCover={uploadCover} />}
       {preview && form && <BlogPostPreview post={form} categoryName={categories.find(c => c._id === form.categoryId)?.name} onClose={() => setPreview(false)} />}
     </div>
   );

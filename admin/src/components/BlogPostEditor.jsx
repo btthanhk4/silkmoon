@@ -4,6 +4,7 @@ export default function BlogPostEditor({
   form,
   categories,
   uploading,
+  saving,
   onChange,
   onClose,
   onPreview,
@@ -113,7 +114,9 @@ export default function BlogPostEditor({
           <button type="button" className="secondary-button" onClick={onClose}>
             Hủy
           </button>
-          <button className="primary-button">Lưu bài viết</button>
+          <button className="primary-button" disabled={uploading || saving}>
+            {saving ? "Đang lưu…" : "Lưu bài viết"}
+          </button>
         </div>
       </form>
     </div>

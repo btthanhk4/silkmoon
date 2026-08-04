@@ -722,6 +722,47 @@ const bannerTypographyDefaults = {
   mobile: { fontFamily: "Manrope", labelSize: 10, titleSize: 38, descSize: 15 },
 };
 const bannerFonts = ["Manrope", "Be Vietnam Pro", "Montserrat", "Playfair Display", "Lora", "Roboto"];
+const emptyFontSource = { url: "", family: "" };
+const inferFontFamily = (value) => {
+  try {
+    const url = new URL(value);
+    if (!/^https?:$/.test(url.protocol)) return "";
+    const family = url.searchParams.getAll("family")[0];
+    return family ? family.split(":")[0].trim() : "";
+  } catch {
+    return "";
+  }
+};
+const isDirectFontUrl = (value) => {
+  try {
+    return /\.(woff2?|ttf|otf)$/i.test(new URL(value).pathname);
+  } catch {
+    return false;
+  }
+};
+
+function ExternalFontLoader({ source }) {
+  useEffect(() => {
+    const url = source?.url?.trim();
+    const family = source?.family?.trim();
+    if (!url || !family || !/^https?:\/\//i.test(url)) return undefined;
+
+    const element = document.createElement(isDirectFontUrl(url) ? "style" : "link");
+    element.dataset.silkmoonCustomFont = "preview";
+    if (element.tagName === "STYLE") {
+      const safeFamily = family.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const safeUrl = new URL(url).toString().replace(/"/g, "%22");
+      element.textContent = `@font-face { font-family: "${safeFamily}"; src: url("${safeUrl}"); font-display: swap; }`;
+    } else {
+      element.rel = "stylesheet";
+      element.href = url;
+    }
+    document.head.appendChild(element);
+    return () => element.remove();
+  }, [source?.url, source?.family]);
+
+  return null;
+}
 const typographyDeviceSizes = {
   desktop: { pageTitle: 48, intro: 18, eyebrow: 12, sectionTitle: 32, body: 16, cardTitle: 20, cardBody: 14, meta: 12, button: 13, price: 24, optionLabel: 12, optionValue: 16, formLabel: 12, input: 16, stepLabel: 12 },
   tablet: { pageTitle: 42, intro: 17, eyebrow: 11, sectionTitle: 28, body: 16, cardTitle: 19, cardBody: 14, meta: 12, button: 13, price: 23, optionLabel: 12, optionValue: 15, formLabel: 12, input: 16, stepLabel: 11 },
@@ -982,6 +1023,7 @@ export function TypographyManager() {
   const [all, setAll] = useState(contentDefaults);
   const [typography, setTypography] = useState(websiteTypographyDefaults);
   const [pageTypography, setPageTypography] = useState({});
+  const [fontSource, setFontSource] = useState(emptyFontSource);
   const [selectedPage, setSelectedPage] = useState("global");
   const [previewDevice, setPreviewDevice] = useState("desktop");
   const [saving, setSaving] = useState(false);
@@ -997,6 +1039,7 @@ export function TypographyManager() {
         mobile: { ...websiteTypographyDefaults.mobile, ...(row.value?.typography?.mobile || {}) },
       });
       setPageTypography(row.value?.pageTypography || {});
+      setFontSource({ ...emptyFontSource, ...(row.value?.fontSource || {}) });
     });
   }, []);
 
@@ -1010,15 +1053,25 @@ export function TypographyManager() {
   };
   const save = async () => {
     setSaving(true);
-    const value = { ...all, typography, pageTypography };
+    const value = { ...all, typography, pageTypography, fontSource };
     await adminApi.saveSetting("website_content", { value, description: "Nội dung website Silkmoon" });
     setAll(value);
     setSaving(false);
   };
+  const customFontFamily = fontSource.family.trim();
+  const availableFonts = customFontFamily && !bannerFonts.includes(customFontFamily)
+    ? [...bannerFonts, customFontFamily]
+    : bannerFonts;
 
   return (
     <div className="panel section-manager typography-manager">
+      <ExternalFontLoader source={fontSource} />
       <div className="section-location"><span className="material-symbols-outlined">font_download</span><div><small>ĐANG CHỈNH SỬA</small><h2>Font chữ toàn website</h2><p>Áp dụng cho tiêu đề trang, tiêu đề nội dung và văn bản trên các trang ngoài banner.</p></div></div>
+      <div className="font-source-editor">
+        <div><strong>Tải font từ link</strong><small>Dùng link CSS của Google Fonts/Adobe Fonts hoặc link trực tiếp tới file WOFF2, WOFF, TTF, OTF.</small></div>
+        <label><span>Link font</span><input type="url" placeholder="https://fonts.googleapis.com/css2?family=..." value={fontSource.url} onChange={(event) => { const url = event.target.value; const inferredFamily = inferFontFamily(url); setFontSource((current) => ({ ...current, url, ...(inferredFamily ? { family: inferredFamily } : {}) })); }} /></label>
+        <label><span>Tên font</span><input type="text" placeholder="Ví dụ: Cormorant Garamond" value={fontSource.family} onChange={(event) => setFontSource((current) => ({ ...current, family: event.target.value }))} /></label>
+      </div>
       <div className="typography-page-tabs">{typographyPages.map(([key, label]) => <button type="button" key={key} className={selectedPage === key ? "active" : ""} onClick={() => setSelectedPage(key)}>{label}</button>)}</div>
       <div className="banner-device-toolbar"><strong>Xem trước theo thiết bị</strong><div>{[["desktop","desktop_windows","Desktop"],["tablet","tablet_mac","Tablet"],["mobile","smartphone","Mobile"]].map(([device, icon, label]) => <button key={device} type="button" className={previewDevice === device ? "active" : ""} onClick={() => setPreviewDevice(device)}><span className="material-symbols-outlined">{icon}</span>{label}</button>)}</div></div>
       <TypographyPagePreview page={selectedPage} device={previewDevice} values={current} />
@@ -1028,7 +1081,7 @@ export function TypographyManager() {
           {(typographyElementGroups[selectedPage] || typographyElementGroups.global).map(([role, label]) => (
             <div className="typography-element-editor" key={role}>
               <div><strong>{label}</strong><small>{role}</small></div>
-              <label><span>Font chữ</span><select value={current[`${role}FontFamily`] || current.bodyFontFamily} onChange={(event) => update(`${role}FontFamily`, event.target.value)}>{bannerFonts.map((font) => <option key={font} value={font}>{font}</option>)}</select></label>
+              <label><span>Font chữ</span><select value={current[`${role}FontFamily`] || current.bodyFontFamily} onChange={(event) => update(`${role}FontFamily`, event.target.value)}>{availableFonts.map((font) => <option key={font} value={font}>{font}</option>)}</select></label>
               <label><span>Cỡ chữ (px)</span><input type="number" min="8" max="120" value={current[`${role}Size`] || current.bodySize} onChange={(event) => update(`${role}Size`, event.target.value)} /></label>
             </div>
           ))}
