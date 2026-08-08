@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { arApi } from '../../services/api';
 import { FABRICS } from './arUtils';
@@ -44,6 +44,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
   const [isComparing, setIsComparing]       = useState(false);
   const [aiImage, setAiImage]               = useState(null);
   const [isGenerating, setIsGenerating]     = useState(false);
+  const isGeneratingRef                     = useRef(false);
   const [aiError, setAiError]               = useState(null);
   const [retryCountdown, setRetryCountdown] = useState(null);
   const [shareUrl, setShareUrl]             = useState('');
@@ -100,9 +101,11 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
 
   // ── AI mode: generate image ──────────────────────────────
   const runGenerate = async (overrideSrc, targetFabricId = activeFabricId) => {
+    if (isGeneratingRef.current) return; // Khóa request như transaction
     const srcToUse = typeof overrideSrc === 'string' ? overrideSrc : roomImgSrc;
     if (!srcToUse) return;
     setIsGenerating(true);
+    isGeneratingRef.current = true;
     setAiError(null);
     setAiImage(null);
     setIsComparing(false);
@@ -155,11 +158,13 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
       }
     } finally {
       setIsGenerating(false);
+      isGeneratingRef.current = false;
     }
   };
 
 
   const handleFileChange = (e) => {
+    if (isGeneratingRef.current) return;
     const file = e.target.files?.[0];
     if (file) {
       setAiImage(null);
@@ -399,6 +404,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
           fabrics={availableFabrics}
           activeFabricId={activeFabricId}
           setActiveFabricId={(id) => {
+            if (isGeneratingRef.current) return;
             setActiveFabricId(id);
             if (mode === MODES.AI && roomImg) {
               setAiImage(null);
@@ -409,6 +415,7 @@ export default function ARRoomPreview({ isOpen, onClose, productColor, productCo
           setOpacity={setOpacity}
           hasImage={!!roomImg}
           onNewImage={() => { 
+            if (isGeneratingRef.current) return;
             document.getElementById('roomUploadInput')?.click();
           }}
           mode={mode}

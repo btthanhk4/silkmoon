@@ -323,25 +323,27 @@ Output ONLY this JSON format:
 Task: Edit this bedroom photo to show what the bed would look like with a new bed sheet.
 
 Instructions:
-- Replace the ENTIRE bedding set (including all bed sheets, blankets, duvet covers, and pillows) with a luxurious silk fabric in the color: ${fabricName} (hex: ${colorHex})
-- Keep the EXACT SAME perspective, lighting, shadows, and room composition
-- Keep the headboard, footboard, bed frame, nightstands, walls, floors, and room decor completely unchanged
-- The new fabric should follow the same folds, wrinkles, and draping as the original
-- Maintain photorealistic quality — this should look like a real product photo
+- Replace the ENTIRE bedding set (including all bed sheets, blankets, duvet covers, and pillows) with a SOLID COLOR luxurious silk fabric in the color: ${fabricName} (hex: ${colorHex}).
+- COMPLETELY REMOVE ANY EXISTING PATTERNS, PRINTS, STRIPES, OR DESIGNS from the original bedding. The new bedding MUST be a plain, solid color only.
+- Keep the EXACT SAME perspective, lighting, shadows, and room composition.
+- Keep the headboard, footboard, bed frame, nightstands, walls, floors, and room decor completely unchanged.
+- The new fabric should follow the same folds, wrinkles, and draping as the original, but without any of the original patterns.
+- Maintain photorealistic quality — this should look like a real, high-end solid silk product photo.
 
-Output: The edited bedroom photo with the entire bedding set color changed to ${fabricName}.`;
+Output: The edited bedroom photo with the entire bedding set replaced by solid ${fabricName} silk.`;
     const basePrompt = customPrompt
-      ? `${customPrompt}\nMàu sản phẩm: ${fabricName} (${colorHex}). Giữ nguyên phối cảnh, ánh sáng, nội thất và chỉ thay đổi bộ chăn ga trên giường.`
+      ? `${customPrompt}\nMàu sản phẩm: ${fabricName} (${colorHex}). Bắt buộc xóa toàn bộ họa tiết cũ, chỉ giữ màu lụa trơn. Giữ nguyên phối cảnh, ánh sáng, nội thất và chỉ thay đổi bộ chăn ga trên giường.`
       : defaultPrompt;
     const mandatorySilkFinish = `
 
-MANDATORY MATERIAL AND FINISH OVERRIDE (highest priority):
+MANDATORY MATERIAL, PATTERN, AND FINISH OVERRIDE (highest priority):
+- COMPLETELY REMOVE any existing patterns, floral prints, stripes, textures, or graphics from the original bedding. The new bedding MUST be purely solid color (${fabricName}).
 - Render ALL visible bedding surfaces as premium glossy silk, regardless of whether the source bedding looks like cotton, linen, matte fabric, or any other material.
 - Do NOT preserve or reproduce the source fabric's matte, dry, fuzzy, coarse, woven, or cotton-like surface appearance.
 - Add clearly visible but realistic silk luster: smooth reflective fibers, soft specular highlights, and flowing highlight gradients along folds and curves.
-- The silk sheen must be consistently visible across sheets, duvet/blanket, and pillowcases while preserving the requested color.
-- Keep the shine elegant and photorealistic, not metallic, plastic, wet, blown-out, or mirror-like.
-- Adapt reflections to the room's existing light direction so the result remains physically believable.`;
+- The silk sheen must be consistently visible across sheets, duvet/blanket, and pillowcases while preserving the requested solid color.
+- Keep the shine elegant, rich, and photorealistic, not metallic, plastic, wet, blown-out, or mirror-like. Ensure it looks like authentic high-end mulberry silk.
+- Adapt reflections to the room's existing light direction and preserve natural shadows/folds so the result remains physically believable and stunningly realistic.`;
     const prompt = `${basePrompt}${mandatorySilkFinish}`;
 
     const freeModels = [
