@@ -373,12 +373,18 @@ export function ContentManager() {
     </div>
   );
 }
+const defaultServices = [
+  { icon: "inventory_2", title: "Kiểm hàng khi nhận", subtitle: "", text: "Bạn có thể kiểm tra sản phẩm trước khi thanh toán." },
+  { icon: "local_shipping", title: "Miễn phí vận chuyển", subtitle: "(từ 500.000VNĐ)", text: "Chỉ cần chọn sản phẩm bạn yêu thích, việc giao hàng tận nơi để SILKMOON lo." },
+  { icon: "currency_exchange", title: "Thanh toán linh hoạt", subtitle: "", text: "Hỗ trợ đa dạng phương thức thanh toán để việc chăm sóc giấc ngủ trở nên thật đơn giản." },
+];
 const contentDefaults = {
   hero: { title: "", subtitle: "", image: "", buttonText: "", buttonLink: "" },
   header: { logoUrl: "", topLinks: "Về chúng tôi|/about\nBlog|/blog", mainLinks: "Chăn|/shop?category=Chăn\nGa|/shop?category=Ga\nGối|/shop?category=Gối\nBộ đồ ngủ|/shop?category=Đồ ngủ\nPhụ kiện|/shop?category=Phụ kiện\nHướng dẫn chăm sóc|/blog?type=care\nSale|/shop?sale=true", flagUrl: "https://upload.wikimedia.org/wikipedia/commons/2/21/Flag_of_Vietnam.svg" },
   marketing: { headline: "Nghệ Thuật Của Sự Nghỉ Ngơi", subheadline: "Chăm chút giấc ngủ, nâng niu từng khoảnh khắc.", announcement: "Giảm giá 20% cho đơn hàng từ 500.000 vnđ" },
   about: { heroTitle: "Nghệ Thuật Của Sự Nghỉ Ngơi", heroSubtitle: "Khám phá hành trình SILKMOON mang đến trải nghiệm giấc ngủ hoàn mỹ từ những chất liệu tự nhiên thuần khiết nhất.", heroImageUrl: "https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1920&q=80", missionEyebrow: "Về chúng tôi", missionTitle: "Hơn Cả Một Giấc Ngủ Ngon", missionBody1: "Tại SILKMOON, chúng tôi tin rằng ngôi nhà là thánh đường của sự bình yên. Mỗi sản phẩm được ra đời từ niềm đam mê với chất liệu bền vững và thiết kế tối giản.", missionBody2: "Chúng tôi chọn lọc những sợi cotton tốt nhất và quy trình sản xuất thân thiện với môi trường để mỗi đêm của bạn là một hành trình nghỉ ngơi đích thực.", missionImageUrl: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=1000&q=80", valuesTitle: "Giá Trị Cốt Lõi", valuesSubtitle: "Những tiêu chí không bao giờ thay đổi trong suốt quá trình phát triển sản phẩm của SILKMOON.", responsibilityText: "Silkmoon coi trọng trách nhiệm, sự chú trọng đến từng chi tiết và tính chuyên nghiệp.", innovationText: "Silkmoon ứng dụng công nghệ hiện đại để nâng cao trải nghiệm mua sắm.", collaborationText: "Silkmoon xây dựng môi trường cởi mở, tôn trọng và hỗ trợ.", transparencyText: "Silkmoon thúc đẩy sự trung thực, cởi mở và giao tiếp rõ ràng." },
   footer: { companyName: "CÔNG TY TNHH SILKMOON", taxCode: "0314604108", description: "Premium Bedding & Sleepwear", address: "Phố Duy Tân, phường Cầu Giấy, thành phố Hà Nội", workingHours: "8h30 - 21h (Hàng ngày)", phone: "086.777.0989 · 035.365.6383", email: "", newsletterTitle: "Nhận thông tin ưu đãi từ SILKMOON", copyright: "© SILKMOON" },
+  services: { cards: defaultServices },
 };
 Object.assign(contentDefaults.footer, {
   logoUrl: "",
@@ -1120,6 +1126,84 @@ export function FooterManager() {
 }
 export function StoryManager() {
   return <WebsiteSectionManager section="about" title="Câu chuyện của chúng tôi" description="Nội dung và hình ảnh hiển thị tại trang Về chúng tôi." labels={{ heroTitle:"Tiêu đề ảnh bìa", heroSubtitle:"Mô tả ảnh bìa", heroImageUrl:"Ảnh bìa", missionEyebrow:"Nhãn giới thiệu", missionTitle:"Tiêu đề câu chuyện", missionBody1:"Đoạn nội dung thứ nhất", missionBody2:"Đoạn nội dung thứ hai", missionImageUrl:"Ảnh câu chuyện", valuesTitle:"Tiêu đề giá trị cốt lõi", valuesSubtitle:"Mô tả giá trị cốt lõi", responsibilityText:"Trách nhiệm", innovationText:"Đổi mới", collaborationText:"Hợp tác", transparencyText:"Minh bạch" }} />;
+}
+export function ServicesManager() {
+  const [cards, setCards] = useState(defaultServices);
+  const [saving, setSaving] = useState(false);
+  const [sectionTitle, setSectionTitle] = useState("An tâm hơn với dịch vụ vượt trội");
+  useEffect(() => {
+    adminApi.getSettings().then((rows) => {
+      const row = rows.find((x) => x.key === "website_content");
+      if (row?.value?.services) {
+        setCards(row.value.services.cards || defaultServices);
+        if (row.value.services.title) setSectionTitle(row.value.services.title);
+      }
+    });
+  }, []);
+  const updateCard = (index, field, value) =>
+    setCards((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
+  const save = async () => {
+    setSaving(true);
+    const rows = await adminApi.getSettings();
+    const row = rows.find((x) => x.key === "website_content");
+    const existing = row?.value || {};
+    await adminApi.saveSetting("website_content", {
+      value: { ...existing, services: { title: sectionTitle, cards } },
+      description: "Nội dung website Silkmoon",
+    });
+    setSaving(false);
+  };
+  return (
+    <div className="panel section-manager">
+      <div className="section-location">
+        <span className="material-symbols-outlined">verified_user</span>
+        <div>
+          <small>ĐANG CHỈNH SỬA</small>
+          <h2>Khối dịch vụ nổi bật</h2>
+          <p>3 thẻ dịch vụ hiển thị trên trang chủ phía dưới banner.</p>
+        </div>
+      </div>
+      <div className="services-preview">
+        <small className="services-preview-label">BẢN XEM TRƯỚC</small>
+        <h2 className="services-preview-title">{sectionTitle}</h2>
+        <div className="services-preview-grid">
+          {cards.map((card, i) => (
+            <div key={i} className="services-preview-card">
+              <span className="material-symbols-outlined">{card.icon || "check_circle"}</span>
+              <strong>{card.title}</strong>
+              {card.subtitle && <small>{card.subtitle}</small>}
+              <p>{card.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="content-fields">
+        <div className="services-section-title-field">
+          <label>
+            <span>Tiêu đề khối</span>
+            <input value={sectionTitle} onChange={(e) => setSectionTitle(e.target.value)} />
+          </label>
+        </div>
+        {cards.map((card, i) => (
+          <div key={i} className="services-card-editor">
+            <div className="services-card-editor-header">
+              <span className="material-symbols-outlined">{card.icon || "check_circle"}</span>
+              <strong>Thẻ {i + 1}</strong>
+            </div>
+            <label><span>Icon (Material Symbol)</span><input value={card.icon} placeholder="ví dụ: local_shipping" onChange={(e) => updateCard(i, "icon", e.target.value)} /></label>
+            <label><span>Tiêu đề</span><input value={card.title} onChange={(e) => updateCard(i, "title", e.target.value)} /></label>
+            <label><span>Phụ đề (không bắt buộc)</span><input value={card.subtitle} placeholder="ví dụ: (từ 500.000VNĐ)" onChange={(e) => updateCard(i, "subtitle", e.target.value)} /></label>
+            <label><span>Nội dung mô tả</span><textarea rows="2" value={card.text} onChange={(e) => updateCard(i, "text", e.target.value)} /></label>
+          </div>
+        ))}
+      </div>
+      <div className="section-save">
+        <button className="primary-button" onClick={save} disabled={saving}>
+          {saving ? "Đang lưu…" : "Lưu khối dịch vụ"}
+        </button>
+      </div>
+    </div>
+  );
 }
 export function AnalyticsManager() {
   const [data, setData] = useState(null);

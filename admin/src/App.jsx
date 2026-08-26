@@ -8,7 +8,7 @@ import CustomersList from './components/CustomersList';
 import CategoriesList from './components/CategoriesList';
 import { BlogCommentsAdmin } from './components/BlogAdmin';
 import { BlogCategoriesManager, BlogPostsManager, BlogVideosManager } from './components/BlogManagement';
-import { AnalyticsManager, ARStudioManager, BannerManager, ChatbotManager, FinanceManager, FooterManager, HeaderManager, MarketingManager, PromotionsManager, ReviewsManager, StoryManager, TypographyManager } from './components/SiteOperations';
+import { AnalyticsManager, ARStudioManager, BannerManager, ChatbotManager, FinanceManager, FooterManager, HeaderManager, MarketingManager, PromotionsManager, ReviewsManager, ServicesManager, StoryManager, TypographyManager } from './components/SiteOperations';
 import NewsletterManager from './components/NewsletterManager';
 import ProductSizeCategoriesManager from './components/ProductSizeCategoriesManager';
 import AdminNotifications from './components/AdminNotifications';
@@ -19,7 +19,7 @@ const navGroups = [
   { label: 'TỔNG QUAN', items: [{ id: 'dashboard', label: 'Tổng quan', icon: 'space_dashboard' }] },
   { label: 'SẢN PHẨM', items: [{ id: 'products', label: 'Quản lý sản phẩm', icon: 'bed' }, { id: 'categories', label: 'Danh mục sản phẩm', icon: 'category' }, { id: 'productSizes', label: 'Phân loại size', icon: 'straighten' }, { id: 'productReviews', label: 'Đánh giá sản phẩm', icon: 'reviews' }, { id: 'promotions', label: 'Mã giảm giá', icon: 'sell' }] },
   { label: 'BLOG', items: [{ id: 'blogPosts', label: 'Quản lý blog', icon: 'article' }, { id: 'blogVideos', label: 'Video blog', icon: 'video_library' }, { id: 'blogCategories', label: 'Danh mục blog', icon: 'topic' }, { id: 'blogComments', label: 'Bình luận blog', icon: 'comment' }] },
-  { label: 'NỘI DUNG WEBSITE', items: [{ id: 'headerContent', label: 'Quản lý header', icon: 'vertical_align_top' }, { id: 'bannerContent', label: 'Quản lý banner', icon: 'panorama' }, { id: 'typographyContent', label: 'Font toàn website', icon: 'font_download' }, { id: 'marketingContent', label: 'Tiêu đề marketing', icon: 'campaign' }, { id: 'storyContent', label: 'Câu chuyện của chúng tôi', icon: 'auto_stories' }, { id: 'footerContent', label: 'Quản lý chân trang', icon: 'vertical_align_bottom' }, { id: 'chatbotContent', label: 'Quản lý chatbot', icon: 'smart_toy' }, { id: 'arStudio', label: 'AR Studio', icon: 'view_in_ar' }] },
+  { label: 'NỘI DUNG WEBSITE', items: [{ id: 'headerContent', label: 'Quản lý header', icon: 'vertical_align_top' }, { id: 'bannerContent', label: 'Quản lý banner', icon: 'panorama' }, { id: 'typographyContent', label: 'Font toàn website', icon: 'font_download' }, { id: 'marketingContent', label: 'Tiêu đề marketing', icon: 'campaign' }, { id: 'servicesContent', label: 'Khối dịch vụ', icon: 'verified_user' }, { id: 'storyContent', label: 'Câu chuyện của chúng tôi', icon: 'auto_stories' }, { id: 'footerContent', label: 'Quản lý chân trang', icon: 'vertical_align_bottom' }, { id: 'chatbotContent', label: 'Quản lý chatbot', icon: 'smart_toy' }, { id: 'arStudio', label: 'AR Studio', icon: 'view_in_ar' }] },
   { label: 'BÁO CÁO', items: [{ id: 'analytics', label: 'Google Analytics', icon: 'monitoring' }, { id: 'finance', label: 'Doanh thu & lợi nhuận', icon: 'payments' }] },
   { label: 'VẬN HÀNH', items: [{ id: 'orders', label: 'Đơn hàng', icon: 'receipt_long' }, { id: 'customers', label: 'Khách hàng', icon: 'group' }, { id: 'newsletter', label: 'Đăng ký nhận ưu đãi', icon: 'mark_email_unread' }] },
 ];
@@ -37,6 +37,7 @@ const pageMeta = {
   marketingContent: ['Tiêu đề marketing', 'Chỉnh sửa thông điệp và thanh thông báo.'],
   footerContent: ['Quản lý chân trang', 'Chỉnh sửa thông tin thương hiệu và liên hệ.'],
   storyContent: ['Câu chuyện của chúng tôi', 'Chỉnh sửa nội dung và hình ảnh trang Về chúng tôi.'],
+  servicesContent: ['Khối dịch vụ', 'Chỉnh sửa 3 thẻ dịch vụ nổi bật hiển thị trên trang chủ.'],
   chatbotContent: ['Quản lý chatbot', 'Nội dung tư vấn và theo dõi token AI.'],
   arStudio: ['AR Studio', 'Cấu hình trải nghiệm AR và theo dõi chi phí AI.'],
   analytics: ['Google Analytics', 'Theo dõi lưu lượng và hành vi người dùng.'],
@@ -100,6 +101,7 @@ function App() {
     marketingContent: <MarketingManager />,
     footerContent: <FooterManager />,
     storyContent: <StoryManager />,
+    servicesContent: <ServicesManager />,
     chatbotContent: <ChatbotManager />,
     arStudio: <ARStudioManager />,
     analytics: <AnalyticsManager />,
