@@ -318,32 +318,35 @@ Output ONLY this JSON format:
 
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-    const defaultPrompt = `You are an expert interior design visualizer.
+    const defaultPrompt = `You are an expert image retoucher and colorist.
 
-Task: Edit this bedroom photo to show what the bed would look like with a new bed sheet.
+Task: Recolor the bedding in this photo to a SOLID COLOR while preserving 100% of the original photo's geometry, wrinkles, and camera angle.
 
 Instructions:
-- Replace the ENTIRE bedding set (including all bed sheets, blankets, duvet covers, and pillows) with a SOLID COLOR luxurious silk fabric in the color: ${fabricName} (hex: ${colorHex}).
+- Recolor the ENTIRE bedding set (sheets, blankets, duvet covers, pillows) to a SOLID COLOR: ${fabricName} (hex: ${colorHex}).
 - COMPLETELY REMOVE ANY EXISTING PATTERNS, PRINTS, STRIPES, OR DESIGNS from the original bedding. The new bedding MUST be a plain, solid color only.
-- Keep the EXACT SAME perspective, lighting, shadows, and room composition.
-- Keep the headboard, footboard, bed frame, nightstands, walls, floors, and room decor completely unchanged.
-- The new fabric should follow the same folds, wrinkles, and draping as the original, but without any of the original patterns.
-- Maintain photorealistic quality — this should look like a real, high-end solid silk product photo.
+- CRITICAL: Keep EXACTLY the same folds, wrinkles, creases, and draping as the original bedding. Do not invent new fabric shapes or change the physical structure of the bed.
+- CRITICAL: Keep EXACTLY the same camera angle, perspective, framing, and crop. Do not zoom in, zoom out, or shift the image.
+- Keep the headboard, footboard, bed frame, nightstands, walls, floors, and room decor 100% completely unchanged.
+- Maintain photorealistic quality.
 
-Output: The edited bedroom photo with the entire bedding set replaced by solid ${fabricName} silk.`;
+Output: The identically framed photo, just with recolored, unpatterned bedding.`;
     const basePrompt = customPrompt
-      ? `${customPrompt}\nMàu sản phẩm: ${fabricName} (${colorHex}). Bắt buộc xóa toàn bộ họa tiết cũ, chỉ giữ màu lụa trơn. Giữ nguyên phối cảnh, ánh sáng, nội thất và chỉ thay đổi bộ chăn ga trên giường.`
+      ? `${customPrompt}\nMàu sản phẩm: ${fabricName} (${colorHex}). Bắt buộc xóa toàn bộ họa tiết cũ, chỉ giữ màu trơn. Giữ nguyên 100% nếp nhăn, nếp gấp cũ. Tuyệt đối không thay đổi góc chụp, không zoom, không thay đổi phối cảnh hay nội thất.`
       : defaultPrompt;
     const mandatorySilkFinish = `
 
 MANDATORY MATERIAL, PATTERN, AND FINISH OVERRIDE (highest priority):
-- COMPLETELY REMOVE any existing patterns, floral prints, stripes, textures, or graphics from the original bedding. The new bedding MUST be purely solid color (${fabricName}).
-- Render ALL visible bedding surfaces as premium glossy silk, regardless of whether the source bedding looks like cotton, linen, matte fabric, or any other material.
-- Do NOT preserve or reproduce the source fabric's matte, dry, fuzzy, coarse, woven, or cotton-like surface appearance.
-- Add clearly visible but realistic silk luster: smooth reflective fibers, soft specular highlights, and flowing highlight gradients along folds and curves.
-- The silk sheen must be consistently visible across sheets, duvet/blanket, and pillowcases while preserving the requested solid color.
-- Keep the shine elegant, rich, and photorealistic, not metallic, plastic, wet, blown-out, or mirror-like. Ensure it looks like authentic high-end mulberry silk.
-- Adapt reflections to the room's existing light direction and preserve natural shadows/folds so the result remains physically believable and stunningly realistic.`;
+- COMPLETELY REMOVE any existing patterns, floral prints, stripes, textures, or graphics. The bedding MUST be purely solid color (${fabricName}).
+- Render ALL visible bedding surfaces as premium soft silk or tencel. It must look natural, comfortable, and breathable.
+- DO NOT make it look like plastic, latex, or overly glossy/shiny material. It should have a subtle, elegant, and soft sheen, not a highly reflective mirror-like finish.
+- The fabric should have a soft, matte-like glow typical of high-quality mulberry silk, rather than harsh specular highlights.
+- STRICT GEOMETRY PRESERVATION: You MUST retain every single wrinkle, crease, and fold exactly where it is in the original image. Treat this as a texture/color replacement, not a structural generation.
+- STRICT CAMERA PRESERVATION: Do NOT change the field of view, zoom level, or perspective.
+
+BACKGROUND PRESERVATION (CRITICAL):
+- DO NOT alter, regenerate, or change any part of the room outside the bed.
+- The walls, floor, windows, decor, nightstands, and overall lighting MUST remain 100% identical to the original image.`;
     const prompt = `${basePrompt}${mandatorySilkFinish}`;
 
     const freeModels = [
