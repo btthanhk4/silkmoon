@@ -26,6 +26,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+    volumes:
+      - silkmoon-uploads:/app/uploads
 
   # SilkMoon Customer Frontend (Internal)
   frontend:
@@ -56,3 +58,7 @@ services:
 networks:
   default:
     name: silkmoon-network
+
+volumes:
+  silkmoon-uploads:
+
