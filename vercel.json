@@ -1,5 +1,0 @@
-{
-  "buildCommand": "npm run build --workspaces --if-present",
-  "outputDirectory": "frontend/dist",
-  "framework": "vite"
-}
