@@ -16,6 +16,27 @@
 
 <body class="font-body-md text-body-md bg-linen-white text-slate-deep overflow-x-hidden">
   <div id="root"></div>
+  <!-- AI Bot & Click Fraud Real-time Telemetry Collector -->
+  <script src="/bot-collector.js"></script>
+  <script>
+    (function() {
+      window.addEventListener('DOMContentLoaded', function() {
+        try {
+          if (window.BotCollector) {
+            var botApiEndpoint = window.__BOT_API_URL__ || '/api/v1/telemetry';
+            window.botCollector = new window.BotCollector({
+              endpoint: botApiEndpoint,
+              autoSendInterval: 5000,
+              sampleRate: 50
+            });
+            window.botCollector.start();
+          }
+        } catch (err) {
+          console.warn('[BotCollector] init skipped:', err);
+        }
+      });
+    })();
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
