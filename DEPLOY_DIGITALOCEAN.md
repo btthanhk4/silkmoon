@@ -1,35 +1,44 @@
-# HƯỚNG DẪN TRIỂN KHAI SILKMOON LÊN DIGITALOCEAN (DROPLET)
+# HƯỚNG DẪN TRIỂN KHAI SILKMOON LÊN DIGITALOCEAN (KIẾN TRÚC ZERO-CODE NGINX PROXY)
 
-Tài liệu này hướng dẫn chi tiết cách triển khai toàn bộ hệ thống website **SilkMoon** và tích hợp hệ thống giám sát hành vi **Bot Detection AI** trên Cloud **DigitalOcean Droplet (Ubuntu 22.04 / 24.04 LTS)**.
-
----
-
-## 1. Yêu cầu chuẩn bị trên DigitalOcean
-1. Tạo 1 **Droplet**:
-   - **OS**: Ubuntu 24.04 LTS (x64).
-   - **Cấu hình đề xuất**: Regular AMD / Intel SSD, 4 GB RAM / 2 vCPU ($24/tháng) hoặc tối thiểu 2 GB RAM ($12/tháng).
-   - **Authentication**: SSH Key hoặc Root Password.
-2. Trỏ tên miền DNS (nếu có domain):
-   - Bản ghi `A` trỏ `@` và `www` về IP của Droplet.
-   - Bản ghi `A` trỏ `api` về IP của Droplet.
+Hệ thống triển khai theo mô hình **Zero-Code Reverse Proxy Injection**:
+Mã nguồn của website SilkMoon hoàn toàn nguyên bản (không cần thêm thẻ script hay sửa bất kỳ dòng code nào). Cổng vào Nginx Gateway sẽ tự động tiêm SDK giám sát và chuyển tiếp telemetry về hệ thống AI chống bot.
 
 ---
 
-## 2. Các bước cài đặt trên máy chủ Droplet
+## 1. Kiến trúc luồng hoạt động
+```
+                              Khách hàng / Bot
+                                     │
+                                     ▼ Port 80 / 443
+                        ┌────────────────────────┐
+                        │   SILKMOON GATEWAY     │
+                        │    (Nginx Reverse)     │
+                        └────────────┬───────────┘
+                                     │
+        ┌────────────────────────────┼────────────────────────────┐
+        │ 1. Tiêm SDK vào HTML       │ 2. Proxy API Backend       │ 3. Proxy Telemetry
+        ▼                            ▼                            ▼
+┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐
+│ silkmoon-frontend│        │ silkmoon-backend │        │bot-detection-core│
+│   (Port 80 nội)  │        │  (Port 3000 nội) │        │  (Port 8000 nội) │
+└──────────────────┘        └──────────────────┘        └──────────────────┘
+```
 
-### Bước 2.1: Cập nhật hệ thống & Cài Docker Engine
-Đăng nhập SSH vào Droplet và chạy:
+* **`/` $\rightarrow$ `silkmoon-frontend`**: Nginx tự động tiêm `<script src="/bot-collector.js"></script>` vào trước thẻ `</body>` trên đường truyền bằng module `sub_filter`.
+* **`/bot-collector.js`**: Nginx lấy trực tiếp bundle SDK từ server `bot-detection-core`.
+* **`/api/v1/telemetry`**: Chuyển tiếp luồng hành vi chuột/touch/canvas về AI server để phân tích gian lận & bot.
+* **`/api/v1/`**: Chuyển tiếp các API của cửa hàng về `silkmoon-backend`.
+
+---
+
+## 2. Các bước triển khai trên DigitalOcean Droplet
+
+### Bước 2.1: Chuẩn bị máy chủ Droplet
+* Tạo 1 Droplet Ubuntu 24.04 LTS (RAM $\ge$ 2GB).
+* Cài Docker & Docker Compose:
 ```bash
-# 1. Cập nhật gói phần mềm
-sudo apt update && sudo apt upgrade -y
-
-# 2. Cài Docker và Docker Compose plugin
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
-
-# 3. Kiểm tra Docker
-docker --version
-docker compose version
 ```
 
 ### Bước 2.2: Clone mã nguồn SilkMoon
@@ -38,43 +47,28 @@ git clone https://github.com/btthanhk4/silkmoon.git /var/www/silkmoon
 cd /var/www/silkmoon
 ```
 
-### Bước 2.3: Thiết lập biến môi trường Backend
-Tạo file `.env` cho backend:
+### Bước 2.3: Thiết lập biến môi trường
 ```bash
 cp backend/.env.example backend/.env
 nano backend/.env
 ```
-Điền các thông tin thực tế:
-- `MONGODB_URI`: Chuỗi kết nối MongoDB Atlas của bạn.
-- `JWT_SECRET`: Khóa bí mật JWT bảo mật.
-- `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`: Thông tin cổng thanh toán PayOS.
-- `MAIL_FROM`, `SMTP_...`: Thông tin gửi mail.
+Điền các giá trị thực tế: `MONGODB_URI`, `JWT_SECRET`, `PAYOS_...`.
 
-### Bước 2.4: Khởi chạy toàn bộ hệ thống bằng Docker Compose
+### Bước 2.4: Khởi chạy toàn bộ hệ thống
 ```bash
 docker compose up -d --build
 ```
-Kiểm tra trạng thái các container:
+Kiểm tra container đang chạy:
 ```bash
 docker compose ps
-docker compose logs -f
 ```
 
 ---
 
-## 3. Tích hợp Mô hình Giám sát Bot Detection AI
-
-Hệ thống Frontend của SilkMoon đã được tích hợp sẵn SDK thu thập hành vi `bot-collector.js`:
-- Telemetry được gửi ngầm tự động mỗi 5 giây (`POST /api/v1/telemetry`).
-- Thu thập quỹ đạo di chuột, cử chỉ touch trên điện thoại, đặc trưng canvas fingerprint, cờ headless browser (Puppeteer, Playwright, Selenium).
-- Khi kết nối với service `bot-detection-core`, toàn bộ lưu lượng bot cào dữ liệu hoặc gian lận click trên SilkMoon sẽ hiển thị trên dashboard giám sát thời gian thực.
-
----
-
-## 4. Cấu hình Nginx & Chứng chỉ SSL HTTPS Miễn phí (Let's Encrypt)
-Để website chạy giao thức an toàn `https://`:
+## 3. Cài đặt SSL HTTPS Miễn phí với Certbot
+Trên máy chủ host Droplet:
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
+sudo apt update && sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 ```
-Certbot sẽ tự động gia hạn chứng chỉ SSL mỗi 90 ngày.
+Certbot sẽ tự động quản lý và gia hạn chứng chỉ SSL vĩnh viễn.

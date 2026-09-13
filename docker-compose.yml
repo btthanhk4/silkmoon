@@ -1,31 +1,43 @@
 services:
-  # SilkMoon NestJS Backend API
+  # Nginx Gateway with Zero-Code Bot Detection Injection
+  gateway:
+    image: nginx:alpine
+    container_name: silkmoon-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+  # SilkMoon NestJS Backend API (Internal)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: silkmoon-backend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     env_file:
       - ./backend/.env
     environment:
       - NODE_ENV=production
       - PORT=3000
 
-  # SilkMoon Customer Frontend (Vite React + Nginx)
+  # SilkMoon Customer Frontend (Internal)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         - VITE_API_URL=/api/v1
-        - VITE_BOT_API_URL=/api/v1/telemetry
     container_name: silkmoon-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend
 
