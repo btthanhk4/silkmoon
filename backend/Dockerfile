@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install dependencies (including devDependencies for TypeScript compilation)
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # Copy source code and build NestJS
 COPY . .
@@ -21,7 +21,7 @@ ENV NODE_ENV=production \
 
 # Install production dependencies only (glibc ensures bcrypt prebuilt binaries run reliably)
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy compiled output from builder
 COPY --from=builder /app/dist ./dist
